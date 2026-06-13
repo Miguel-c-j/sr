@@ -1,0 +1,174 @@
+/* src/styles/room-schedule.css */
+.room-schedule {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.schedule-header {
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.schedule-date {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.date-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.date-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.schedule-legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.7rem;
+}
+
+.legend-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.legend-color.free {
+  background: #ffffff;
+  border: 1px solid #ddd;
+}
+
+.legend-color.occupied {
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+}
+
+.legend-color.reserved {
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+}
+
+.legend-color.selected {
+  background: #2196f3;
+  border: 1px solid #1976d2;
+}
+
+/* Schedule Slots Grid */
+.schedule-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+/* Estilo dos blocos */
+.schedule-slot {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 0.625rem 0.75rem;
+  text-align: center;
+  cursor: default;
+  transition: all 0.2s;
+}
+
+.slot-time {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #555;
+}
+
+/* Bloco Livre */
+.schedule-slot.free {
+  background: #ffffff;
+  border-color: #ddd;
+}
+
+.schedule-slot.free.clickable {
+  cursor: pointer;
+}
+
+.schedule-slot.free.clickable:hover {
+  background: #e3f2fd;
+  border-color: #2196f3;
+  transform: translateX(4px);
+}
+
+/* Bloco Ocupado */
+.schedule-slot.occupied {
+  background: #f5f5f5;
+  border-color: #e0e0e0;
+  cursor: not-allowed;
+}
+
+.schedule-slot.occupied .slot-time {
+  color: #999;
+}
+
+/* Bloco Reservado */
+.schedule-slot.reserved {
+  background: #ffebee;
+  border-color: #ef9a9a;
+  cursor: not-allowed;
+}
+
+.schedule-slot.reserved .slot-time {
+  color: #c62828;
+}
+
+/* Bloco Selecionado */
+.schedule-slot.selected {
+  background: #2196f3;
+  border-color: #1976d2;
+  cursor: pointer;
+}
+
+.schedule-slot.selected .slot-time {
+  color: white;
+  font-weight: 600;
+}
+
+.schedule-slot.selected:hover {
+  background: #1e88e5;
+  transform: translateX(4px);
+}
+
+/* Scroll para os slots */
+.schedule-slots::-webkit-scrollbar {
+  width: 6px;
+}
+
+.schedule-slots::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.schedule-slots::-webkit-scrollbar-thumb {
+  background: #1a472a;
+  border-radius: 3px;
+}
+
+.schedule-slots::-webkit-scrollbar-thumb:hover {
+  background: #0d2818;
+}
