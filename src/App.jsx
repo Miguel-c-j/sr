@@ -2,6 +2,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout/Layout";
 import LoginPage from "./pages/LoginPage";
+import ProfileSelect from "./pages/ProfileSelect";
 import RoomsPage from "./pages/RoomsPage";
 import ReservationsPage from "./pages/ReservationsPage";
 import PendingRequests from "./pages/secretariat/PendingRequests";
@@ -45,6 +46,13 @@ function App() {
       <Routes>
         {/* Rota pública de login */}
         <Route path="/login" element={<LoginPage />} />
+
+        {/* Seleção de perfil (após login, quando há 2+ perfis) */}
+        <Route path="/selecionar-perfil" element={
+          <ProtectedRoute>
+            <ProfileSelect />
+          </ProtectedRoute>
+        } />
 
         {/* Rotas de Aluno/Docente/Convidado */}
         <Route path="/salas" element={

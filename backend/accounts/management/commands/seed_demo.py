@@ -1,5 +1,6 @@
 from datetime import date, time, timedelta
 
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
@@ -42,6 +43,8 @@ USERS = [
     ("secretariado@uevora.pt", "Maria Santos", ["secretariado"], "Secretariado Academico", ["all"]),
     ("professor@uevora.pt", "Joao Silva", ["docente"], "Engenharia Informatica", []),
     ("aluno@alunos.uevora.pt", "Ana Costa", ["aluno"], "Engenharia Informatica", []),
+    # Conta com varios perfis — demonstra a pagina de selecao de perfil no login.
+    ("coordenacao@uevora.pt", "Teresa Rodrigues", ["secretariado", "docente"], "Coordenacao", ["all"]),
 ]
 
 
@@ -126,11 +129,14 @@ class Command(BaseCommand):
             )
             created += int(was_created)
 
+        # Importa tambem as salas reais do CLAV (SALAS CLAV.xlsx).
+        call_command("seed_clav")
+
         self.stdout.write(
             self.style.SUCCESS(
                 f"Seed concluido: {len(buildings)} edificios, {len(rooms)} salas, "
                 f"{len(equipment)} equipamentos, {len(users)} utilizadores, "
-                f"{created} reservas novas."
+                f"{created} reservas novas (+ salas do CLAV acima)."
             )
         )
         self.stdout.write(

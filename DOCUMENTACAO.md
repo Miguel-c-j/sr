@@ -83,15 +83,17 @@ sr/
 ├── package.json
 │
 ├── src/                       # ========== FRONTEND ==========
-│   ├── main.jsx               # Bootstrap do React
+│   ├── main.jsx               # Bootstrap do React (+ GoogleOAuthProvider)
 │   ├── App.jsx                # Rotas + proteção de rotas por perfil
 │   ├── index.css
 │   │
 │   ├── services/
-│   │   └── api.js             # ⭐ Camada de acesso à API (todas as chamadas fetch)
+│   │   ├── api.js             # ⭐ Camada de acesso à API (todas as chamadas fetch)
+│   │   └── auth.js            # Lógica de perfis/sessão (perfil ativo, página inicial)
 │   │
 │   ├── pages/                 # Uma página por ecrã
-│   │   ├── LoginPage.jsx
+│   │   ├── LoginPage.jsx               # Login por email + Google (sem dropdown)
+│   │   ├── ProfileSelect.jsx           # Escolher perfil (quando há 2+)
 │   │   ├── RoomsPage.jsx               # Pesquisar e reservar salas
 │   │   ├── ReservationsPage.jsx        # "Minhas Reservas"
 │   │   ├── secretariat/
@@ -127,13 +129,14 @@ sr/
     │   ├── managers.py        # UserManager
     │   ├── validators.py      # Validação @uevora.pt / @alunos.uevora.pt
     │   ├── serializers.py
-    │   ├── views.py           # LoginView + UserViewSet
-    │   └── management/commands/seed_demo.py   # ⭐ Dados de demonstração
+    │   ├── views.py           # LoginView + GoogleLoginView + UserViewSet
+    │   └── management/commands/seed_demo.py   # ⭐ Dados demo (chama também seed_clav)
     │
     ├── facilities/            # App: edifícios, equipamentos, salas
     │   ├── models.py          # Building, Equipment, Room
     │   ├── serializers.py
-    │   └── views.py           # ViewSets + disponibilidade/horário
+    │   ├── views.py           # ViewSets + disponibilidade/horário
+    │   └── management/commands/seed_clav.py   # Salas reais do CLAV (SALAS CLAV.xlsx)
     │
     ├── reservations/          # App: reservas
     │   ├── models.py          # Reservation
@@ -151,8 +154,11 @@ Os ficheiros marcados com ⭐ são os mais importantes para perceber o sistema.
 
 ## 4. Perfis de acesso
 
-Um utilizador pode ter **vários perfis** em simultâneo. No login escolhe-se com qual
-"entrar". Os menus e as rotas acessíveis dependem do perfil ativo.
+Um utilizador pode ter **vários perfis** em simultâneo. Os perfis são definidos na
+**conta** (no servidor), não escolhidos no login. Se a conta tiver 2 ou mais perfis,
+após autenticar é mostrada a **página de seleção de perfil** (`/selecionar-perfil`)
+para escolher com qual entrar nessa sessão. Os menus e as rotas acessíveis dependem
+do perfil ativo.
 
 | Perfil | O que pode fazer | Página inicial |
 |--------|------------------|----------------|
@@ -182,6 +188,7 @@ Mapa de rotas:
 | Rota | Página | Perfis permitidos |
 |------|--------|-------------------|
 | `/login` | LoginPage | (público) |
+| `/selecionar-perfil` | ProfileSelect | autenticado (só útil com 2+ perfis) |
 | `/salas` | RoomsPage | autenticado |
 | `/reservas` | ReservationsPage | aluno, docente, admin |
 | `/pendentes` | PendingRequests | secretariado, admin |
@@ -199,22 +206,36 @@ Todo o acesso ao backend passa por `src/services/api.js`. Concentra:
 - A `API_BASE_URL` (`http://localhost:8000/api`).
 - A gestão do **token JWT** no `localStorage` (`access_token`, `refresh_token`, `user`).
 - O cabeçalho `Authorization: Bearer <token>` adicionado automaticamente.
-- Um método por operação: `login`, `getRooms`, `createReservation`,
+- Um método por operação: `login`, `loginWithGoogle`, `getRooms`, `createReservation`,
   `approveReservation`, `getPendingReservations`, `importData`, etc.
 
 Vantagem: as páginas **não sabem** detalhes de HTTP — apenas chamam `api.algumaCoisa()`.
 
+A lógica de **perfis/sessão** está separada em `src/services/auth.js`:
+`getPrimaryRole`, `getDefaultPage`, `applyRole` (grava o perfil ativo escolhido) e
+`PROFILE_META` (rótulos/ícones). É partilhada pelo `LoginPage` e pelo `ProfileSelect`.
+
 ### 5.3 Autenticação (passo a passo)
 
-1. O utilizador escreve o email institucional e escolhe um perfil no `LoginPage`.
-2. `api.login(email)` faz `POST /api/users/login/`.
-3. O backend valida o domínio e devolve `{ access, refresh, user }`. O `api.js` guarda
-   tudo no `localStorage`.
-4. O `LoginPage` deriva o **perfil ativo** (`role`) a partir dos `profiles` reais que
-   vieram do servidor e calcula a página inicial. Guarda o objeto `user` enriquecido.
-5. O `Header` e o `Sidebar` leem esse `user` para mostrar nome/menus corretos.
-6. A partir daqui, cada chamada inclui o token; ao terminar sessão, o `Header` chama
+Há **dois modos de login** (sem dropdown de perfil):
+
+- **Email institucional** (sem password) → `api.login(email)` → `POST /api/users/login/`.
+- **Google** (se configurado) → `api.loginWithGoogle(idToken)` → `POST /api/users/google-login/`.
+
+Fluxo comum após autenticar:
+
+1. O backend valida o domínio (`@uevora.pt` / `@alunos.uevora.pt`) e devolve
+   `{ access, refresh, user }`. O `api.js` guarda tudo no `localStorage`.
+2. O `LoginPage` olha para `user.profiles`:
+   - **1 perfil** → `applyRole` define o perfil ativo e navega para a página inicial.
+   - **2+ perfis** → navega para **`/selecionar-perfil`**, onde o utilizador escolhe;
+     só aí o perfil ativo é gravado.
+3. O `Header` e o `Sidebar` leem o `user` para mostrar nome/menus corretos.
+4. Cada chamada seguinte inclui o token; ao terminar sessão, o `Header` chama
    `api.logout()` que limpa tokens + user.
+
+> O perfil **vem sempre da conta no servidor** — nunca é escolhido livremente no ecrã.
+> A seleção de perfil só permite escolher entre os perfis que a conta **já tem**.
 
 ### 5.4 Páginas principais
 
@@ -412,6 +433,7 @@ Base: `http://localhost:8000/api`
 | Método | Rota | Descrição | Quem |
 |--------|------|-----------|------|
 | POST | `/users/login/` | Login por email → tokens JWT | público |
+| POST | `/users/google-login/` | Login com Google (ID token) → tokens JWT | público |
 | GET/PATCH/DELETE | `/users/` | Gestão de utilizadores | admin |
 | GET/POST/PUT/DELETE | `/buildings/` | Edifícios (com `roomCount`) | autenticado |
 | GET/POST/PUT/DELETE | `/equipment/` | Equipamentos (com `usageCount`) | autenticado |
@@ -487,9 +509,10 @@ pip install -r requirements.txt
 # 3. (Opcional) Configuração — há defaults que batem com o docker-compose
 cp .env.example .env
 
-# 4. Migrações + dados de demonstração
+# 4. Migrações + dados (demo + salas reais do CLAV)
 python manage.py migrate
-python manage.py seed_demo
+python manage.py seed_demo        # inclui automaticamente as salas do CLAV
+# (em alternativa, só o CLAV: python manage.py seed_clav)
 
 # 5. Servidor
 python manage.py runserver        # http://localhost:8000
@@ -518,10 +541,46 @@ docker compose down                # parar a base de dados
 
 ---
 
+## 11.1 Configurar login com Google (opcional)
+
+O sistema suporta dois modos de login: **email institucional** (sempre ativo) e
+**Google** (ativa-se quando configurado). O perfil é determinado pela conta no
+servidor; se o utilizador tiver **2 ou mais perfis**, é mostrada uma **página de
+seleção de perfil** após o login.
+
+Para ativar o botão "Entrar com Google":
+
+1. Em [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services →
+   Credentials** → *Create credentials* → **OAuth client ID** → tipo **Web application**.
+2. Em **Authorized JavaScript origins** adiciona `http://localhost:5173`.
+3. Copia o **Client ID** gerado (algo como `xxxx.apps.googleusercontent.com`).
+4. **Frontend** — cria `.env.local` na raiz do projeto:
+   ```dotenv
+   VITE_GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+   ```
+5. **Backend** — em `backend/.env` define o **mesmo** id:
+   ```dotenv
+   GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+   ```
+6. Reinicia o `npm run dev` e o `runserver`.
+
+Notas:
+- Sem estas variáveis, o botão Google fica escondido e o login por email continua a
+  funcionar normalmente.
+- O backend **verifica** o token do Google e só aceita emails `@uevora.pt` /
+  `@alunos.uevora.pt` (contas Google fora destes domínios são recusadas).
+- O Client ID OAuth não é segredo (fica exposto no browser), mas é por-deployment —
+  por isso vive no `.env.local` (ignorado pelo git).
+
+---
+
 ## 12. Contas e dados de demonstração
 
-O comando `seed_demo` cria 4 edifícios, 7 salas, 8 equipamentos, alguns utilizadores e
-reservas de exemplo (pendentes, confirmadas e históricas).
+O comando `seed_demo` cria os dados de demonstração (4 edifícios + 7 salas pequenas,
+equipamentos, utilizadores e reservas de exemplo — pendentes, confirmadas e históricas)
+e, no fim, chama o `seed_clav` que importa as **34 salas reais do Colégio Luís António
+Verney** (ficheiro `SALAS CLAV.xlsx`). Total: **5 edifícios, 41 salas**. É idempotente
+(pode correr várias vezes sem duplicar).
 
 Login (a password é ignorada — basta o email):
 
@@ -531,6 +590,7 @@ Login (a password é ignorada — basta o email):
 | `secretariado@uevora.pt` | secretariado | pendentes |
 | `professor@uevora.pt` | docente | salas |
 | `aluno@alunos.uevora.pt` | aluno | salas |
+| `coordenacao@uevora.pt` | secretariado + docente | **mostra a página de seleção de perfil** |
 
 > Para entrar no admin do Django (`/admin/`) é preciso uma password — usa
 > `python manage.py createsuperuser` ou define uma para o `admin@uevora.pt`.

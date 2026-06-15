@@ -28,6 +28,22 @@ const api = {
     return { ok: response.ok, data };
   },
 
+  // Login com Google: envia o ID token (credential) devolvido pelo Google
+  loginWithGoogle: async (credential) => {
+    const response = await fetch(`${API_BASE_URL}/users/google-login/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential })
+    });
+    const data = await response.json();
+    if (response.ok) {
+      localStorage.setItem('access_token', data.access);
+      localStorage.setItem('refresh_token', data.refresh);
+      localStorage.setItem('user', JSON.stringify(data.user));
+    }
+    return { ok: response.ok, data };
+  },
+
   logout: () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');

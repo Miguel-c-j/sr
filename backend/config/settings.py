@@ -18,6 +18,9 @@ SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
 
+# OAuth Google: ID do cliente (Google Cloud Console). Vazio = login Google desativado.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",

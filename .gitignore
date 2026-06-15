@@ -29,3 +29,10 @@ backend/.env
 __pycache__/
 *.py[cod]
 *.sqlite3
+
+# Variáveis do frontend (Vite)
+.env.local
+
+# Dados-fonte (importados via seed_clav; não necessários em runtime)
+*.xlsx
+.~lock.*#

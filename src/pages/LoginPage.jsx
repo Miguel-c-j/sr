@@ -1,52 +1,45 @@
 // src/pages/LoginPage.jsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaEnvelope, FaUserTag, FaSignInAlt, FaUniversity } from 'react-icons/fa';
+import { GoogleLogin } from '@react-oauth/google';
+import { FaEnvelope, FaSignInAlt, FaUniversity } from 'react-icons/fa';
 import api from '../services/api';
+import { applyRole, getPrimaryRole } from '../services/auth';
 import '../styles/login.css';
 
-// Prioridade para escolher o perfil ativo quando o utilizador tem varios.
-const ROLE_PRIORITY = ['administrador', 'secretariado', 'docente', 'aluno', 'convidado'];
-const getPrimaryRole = (profiles = []) =>
-  ROLE_PRIORITY.find(role => profiles.includes(role)) || 'convidado';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 const LoginPage = ({ onLogin }) => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('aluno');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Perfis disponíveis
-  const profiles = [
-    { id: 'convidado', label: 'Convidado', icon: '👤', description: 'Acesso limitado apenas para visualização' },
-    { id: 'aluno', label: 'Aluno', icon: '🎓', description: 'Pode reservar salas para estudo' },
-    { id: 'docente', label: 'Docente', icon: '👨‍🏫', description: 'Prioridade nas reservas' },
-    { id: 'secretariado', label: 'Secretariado', icon: '📋', description: 'Aprova reservas e gere conflitos' },
-    { id: 'administrador', label: 'Administrador', icon: '⚙️', description: 'Acesso total ao sistema' }
-  ];
-
-  // Definir página inicial baseada no perfil
-  const getDefaultPage = (role) => {
-    switch (role) {
-      case 'administrador':
-        return '/gerir-salas';
-      case 'secretariado':
-        return '/pendentes';
-      case 'docente':
-      case 'aluno':
-      case 'convidado':
-      default:
-        return '/salas';
-    }
-  };
-
-  const validateEmail = (email) => {
+  const validateEmail = (value) => {
     const alunoPattern = /^[a-zA-Z0-9._-]+@alunos\.uevora\.pt$/;
     const professorPattern = /^[a-zA-Z0-9._-]+@uevora\.pt$/;
-    return alunoPattern.test(email) || professorPattern.test(email);
+    return alunoPattern.test(value) || professorPattern.test(value);
   };
 
+  // Decide para onde ir após autenticar: se o utilizador tiver 2+ perfis,
+  // mostra a página de seleção; caso contrário entra direto.
+  const finalizeLogin = (user) => {
+    const profiles = user?.profiles || [];
+
+    if (profiles.length >= 2) {
+      // Guarda o utilizador sem perfil ativo definido; a seleção define-o.
+      localStorage.setItem('user', JSON.stringify(user));
+      navigate('/selecionar-perfil');
+      return;
+    }
+
+    const role = profiles[0] || getPrimaryRole(profiles);
+    const enriched = applyRole(user, role);
+    if (onLogin) onLogin(enriched);
+    navigate(enriched.defaultPage);
+  };
+
+  // Login por email institucional (sem password)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -55,78 +48,44 @@ const LoginPage = ({ onLogin }) => {
       setError('Por favor, insira o seu email institucional.');
       return;
     }
-
     if (!validateEmail(email)) {
       setError('Por favor, utilize um email institucional válido (@uevora.pt ou @alunos.uevora.pt)');
       return;
     }
 
     setIsLoading(true);
-
     try {
       const { ok, data } = await api.login(email);
-
       if (!ok) {
         setError(data.detail || 'Não foi possível autenticar. Tente novamente.');
-        setIsLoading(false);
         return;
       }
-
-      // Os perfis reais vêm do servidor. O dropdown é apenas a "vista" desejada:
-      // se o utilizador tiver esse perfil usamo-lo, senão usamos o de maior prioridade.
-      const profiles = data.user?.profiles || [];
-      const activeRole = profiles.includes(role) ? role : getPrimaryRole(profiles);
-      const defaultPage = getDefaultPage(activeRole);
-
-      const userData = {
-        ...data.user,
-        role: activeRole,
-        name: data.user?.name || getDisplayName(email, activeRole),
-        permissions: getPermissionsByRole(activeRole),
-        defaultPage,
-        loginTime: new Date().toISOString()
-      };
-
-      // api.login já guardou tokens e user; gravamos a versão enriquecida.
-      localStorage.setItem('user', JSON.stringify(userData));
-
-      if (onLogin) {
-        onLogin(userData);
-      }
-
-      setIsLoading(false);
-      navigate(defaultPage);
+      finalizeLogin(data.user);
     } catch (err) {
       console.error('Erro no login:', err);
       setError('Erro de ligação ao servidor. Verifique se o backend está a correr.');
+    } finally {
       setIsLoading(false);
     }
   };
 
-  const getDisplayName = (email, role) => {
-    const name = email.split('@')[0];
-    const formattedName = name.split('.').map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
-
-    const roleNames = {
-      convidado: 'Visitante',
-      aluno: 'Aluno',
-      docente: 'Prof.',
-      secretariado: 'Secretariado',
-      administrador: 'Admin'
-    };
-
-    return `${roleNames[role]} ${formattedName}`;
-  };
-
-  const getPermissionsByRole = (role) => {
-    const permissions = {
-      convidado: ['ver_reservas'],
-      aluno: ['reservar', 'ver_reservas'],
-      docente: ['reservar', 'ver_reservas', 'prioridade'],
-      secretariado: ['aprovar_pendentes', 'gerir_conflitos', 'importar_dados'],
-      administrador: ['gerir_salas', 'gerir_equipamentos', 'gerir_edificios', 'gerir_utilizadores']
-    };
-    return permissions[role] || permissions.convidado;
+  // Login com Google: recebe o ID token e envia-o ao backend
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setError('');
+    setIsLoading(true);
+    try {
+      const { ok, data } = await api.loginWithGoogle(credentialResponse.credential);
+      if (!ok) {
+        setError(data.detail || 'Não foi possível autenticar com o Google.');
+        return;
+      }
+      finalizeLogin(data.user);
+    } catch (err) {
+      console.error('Erro no login Google:', err);
+      setError('Erro de ligação ao servidor.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -151,6 +110,27 @@ const LoginPage = ({ onLogin }) => {
               </div>
             )}
 
+            {/* Login com Google */}
+            {GOOGLE_CLIENT_ID ? (
+              <div className="google-login-wrapper">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setError('Falha na autenticação com o Google.')}
+                  text="signin_with"
+                  locale="pt-PT"
+                  width="280"
+                />
+              </div>
+            ) : (
+              <div className="login-info" style={{ marginBottom: '1rem' }}>
+                <p className="info-title">ℹ️ Login Google não configurado</p>
+                <p>Define <code>VITE_GOOGLE_CLIENT_ID</code> (frontend) e <code>GOOGLE_CLIENT_ID</code> (backend) para ativar.</p>
+              </div>
+            )}
+
+            <div className="login-divider"><span>ou</span></div>
+
+            {/* Login por email institucional */}
             <div className="form-group">
               <label>
                 <FaEnvelope className="input-icon" />
@@ -160,48 +140,15 @@ const LoginPage = ({ onLogin }) => {
                 type="email"
                 placeholder="exemplo@uevora.pt ou @alunos.uevora.pt"
                 value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (e.target.value.includes('@alunos.uevora.pt')) {
-                    setRole('aluno');
-                  } else if (e.target.value.includes('@uevora.pt')) {
-                    setRole('docente');
-                  }
-                }}
+                onChange={(e) => setEmail(e.target.value)}
                 className="login-input"
-                required
               />
               <small className="input-hint">
                 Utilize o seu email institucional (@uevora.pt ou @alunos.uevora.pt)
               </small>
             </div>
 
-            <div className="form-group">
-              <label>
-                <FaUserTag className="input-icon" />
-                Perfil de Acesso
-              </label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="login-select"
-              >
-                {profiles.map(profile => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.icon} {profile.label} - {profile.description}
-                  </option>
-                ))}
-              </select>
-              <small className="input-hint">
-                Selecione o perfil com que deseja aceder ao sistema
-              </small>
-            </div>
-
-            <button
-              type="submit"
-              className="login-button"
-              disabled={isLoading}
-            >
+            <button type="submit" className="login-button" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <div className="spinner-small"></div>
@@ -216,7 +163,7 @@ const LoginPage = ({ onLogin }) => {
 
             <div className="login-info">
               <p className="info-title">ℹ️ Informação de Demonstração</p>
-              <p>Este é um sistema de demonstração. Utilize qualquer email válido do domínio @uevora.pt ou @alunos.uevora.pt</p>
+              <p>Utilize qualquer email válido do domínio @uevora.pt ou @alunos.uevora.pt</p>
               <div className="demo-emails">
                 <small>Exemplos:</small>
                 <code>admin@uevora.pt (Admin)</code>
