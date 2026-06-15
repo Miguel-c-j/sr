@@ -1,0 +1,17 @@
+package com.example.application.BD.repositorios;
+
+import com.example.application.BD.entidades.Sala;
+import jakarta.transaction.Transactional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface SalaEquipamentoRepository extends JpaRepository<Sala, Long> {
+
+    @Modifying
+    @Transactional
+    @Query(value = "DELETE FROM sala_equipamento WHERE equipamento_id = :id", nativeQuery = true)
+    void deleteByEquipamentoId(Long id);
+}

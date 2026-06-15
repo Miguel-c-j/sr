@@ -1,0 +1,15 @@
+package com.example.application.BD.repositorios;
+
+import com.example.application.BD.entidades.Polo;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface PoloRepository extends JpaRepository<Polo, Long> {
+
+    Optional<Polo> findByNome(String nome);
+
+    boolean existsByNome(String nome);
+}

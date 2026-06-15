@@ -9,11 +9,13 @@ import {
   FaCheck,
   FaSave
 } from 'react-icons/fa';
+import api from '../../services/api';
 import '../../styles/management.css';
 
 const ManageRooms = () => {
   const [buildings, setBuildings] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [equipmentList, setEquipmentList] = useState([]);
 
   // Estado para controlar qual ação está ativa
   const [activeAction, setActiveAction] = useState(null); // 'create', 'edit', 'delete'
@@ -41,37 +43,31 @@ const ManageRooms = () => {
     equipment: []
   });
 
-  // Mock data
+  // Carregar edifícios, salas e equipamentos
   useEffect(() => {
-    const mockBuildings = [
-      { id: 1, name: 'Colégio do Espírito Santo', address: 'Largo dos Colegiais, 2' },
-      { id: 2, name: 'Colégio Mateus de Aranda', address: 'Rua da Universidade, 1' },
-      { id: 3, name: 'Pólo da Mitra', address: 'Estrada da Mitra' },
-      { id: 4, name: 'Complexo Desportivo', address: 'Avenida da Universidade' }
-    ];
-
-    const mockRooms = [
-      { id: 1, name: 'Sala 101', capacity: 30, buildingId: 1, type: 'aula', equipment: ['projetor', 'quadro', 'wifi'] },
-      { id: 2, name: 'Sala 102', capacity: 25, buildingId: 1, type: 'aula', equipment: ['quadro', 'wifi'] },
-      { id: 3, name: 'Laboratório 202', capacity: 20, buildingId: 1, type: 'laboratorio', equipment: ['computadores', 'projetor', 'wifi'] },
-      { id: 4, name: 'Sala de Reuniões 305', capacity: 15, buildingId: 2, type: 'reuniao', equipment: ['videoconferencia', 'wifi', 'quadro'] },
-      { id: 5, name: 'Auditório', capacity: 150, buildingId: 4, type: 'aula', equipment: ['projetor', 'som', 'arcondicionado'] }
-    ];
-
-    setBuildings(mockBuildings);
-    setRooms(mockRooms);
+    const fetchData = async () => {
+      try {
+        const [buildingsData, roomsData, equipmentData] = await Promise.all([
+          api.getBuildings(),
+          api.getRooms(),
+          api.getEquipment()
+        ]);
+        setBuildings(Array.isArray(buildingsData) ? buildingsData : []);
+        setRooms(Array.isArray(roomsData) ? roomsData : []);
+        // Mapear equipamentos do servidor para o formato dos checkboxes ({id: code}).
+        setEquipmentList(
+          (Array.isArray(equipmentData) ? equipmentData : []).map(eq => ({
+            id: eq.code,
+            label: eq.name,
+            icon: eq.icon
+          }))
+        );
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+      }
+    };
+    fetchData();
   }, []);
-
-  const equipmentList = [
-    { id: 'projetor', label: 'Projetor', icon: '📽️' },
-    { id: 'quadro', label: 'Quadro Branco', icon: '📋' },
-    { id: 'wifi', label: 'WiFi', icon: '📶' },
-    { id: 'computadores', label: 'Computadores', icon: '💻' },
-    { id: 'arcondicionado', label: 'Ar Condicionado', icon: '❄️' },
-    { id: 'videoconferencia', label: 'Videoconferência', icon: '🎥' },
-    { id: 'som', label: 'Sistema de Som', icon: '🔊' },
-    { id: 'quadrointerativo', label: 'Quadro Interativo', icon: '🖥️' }
-  ];
 
   const roomTypes = [
     { id: 'aula', label: 'Sala de Aula' },
@@ -136,71 +132,86 @@ const ManageRooms = () => {
   };
 
   // Submeter criação
-  const handleCreateSubmit = () => {
+  const handleCreateSubmit = async () => {
     if (!createFormData.name || !createFormData.capacity || !createFormData.buildingId) {
       alert('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
 
-    const newRoom = {
-      id: Math.max(...rooms.map(r => r.id), 0) + 1,
-      name: createFormData.name,
-      capacity: parseInt(createFormData.capacity),
-      buildingId: parseInt(createFormData.buildingId),
-      type: createFormData.type,
-      equipment: [...createFormData.equipment]
-    };
-
-    setRooms(prev => [...prev, newRoom]);
-    alert('Sala criada com sucesso!');
-    setActiveAction(null);
+    try {
+      const created = await api.createRoom({
+        name: createFormData.name,
+        capacity: parseInt(createFormData.capacity),
+        buildingId: parseInt(createFormData.buildingId),
+        type: createFormData.type,
+        equipment: [...createFormData.equipment]
+      });
+      if (created?.id) {
+        setRooms(prev => [...prev, created]);
+        alert('Sala criada com sucesso!');
+        setActiveAction(null);
+      } else {
+        alert('Não foi possível criar a sala.');
+      }
+    } catch (error) {
+      console.error('Erro ao criar sala:', error);
+      alert('Erro ao criar sala.');
+    }
   };
 
   // Submeter edição
-  const handleEditSubmit = () => {
+  const handleEditSubmit = async () => {
     if (!editFormData.name || !editFormData.capacity || !editFormData.buildingId) {
       alert('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
 
-    setRooms(prev => prev.map(room =>
-      room.id === editFormData.id
-        ? {
-            ...room,
-            name: editFormData.name,
-            capacity: parseInt(editFormData.capacity),
-            buildingId: editFormData.buildingId,
-            type: editFormData.type,
-            equipment: [...editFormData.equipment]
-          }
-        : room
-    ));
-    alert('Sala atualizada com sucesso!');
-    setActiveAction(null);
-    setSelectedBuildingId('');
-    setSelectedRoomId('');
+    try {
+      const updated = await api.updateRoom(editFormData.id, {
+        name: editFormData.name,
+        capacity: parseInt(editFormData.capacity),
+        buildingId: parseInt(editFormData.buildingId),
+        type: editFormData.type,
+        equipment: [...editFormData.equipment]
+      });
+      if (updated?.id) {
+        setRooms(prev => prev.map(room => (room.id === editFormData.id ? updated : room)));
+        alert('Sala atualizada com sucesso!');
+        setActiveAction(null);
+        setSelectedBuildingId('');
+        setSelectedRoomId('');
+      } else {
+        alert('Não foi possível atualizar a sala.');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar sala:', error);
+      alert('Erro ao atualizar sala.');
+    }
   };
 
   // Eliminar sala
-  const handleDeleteSubmit = () => {
+  const handleDeleteSubmit = async () => {
     if (!selectedRoomId) {
       alert('Por favor, selecione uma sala para eliminar.');
       return;
     }
 
-    const hasReservations = false; // TODO: Check with API
-
-    if (hasReservations) {
-      alert('Não é possível eliminar esta sala pois existem reservas futuras associadas.');
-      return;
-    }
-
     if (window.confirm('Tem certeza que deseja eliminar esta sala? Esta ação não pode ser desfeita.')) {
-      setRooms(prev => prev.filter(room => room.id !== parseInt(selectedRoomId)));
-      alert('Sala eliminada com sucesso!');
-      setActiveAction(null);
-      setSelectedBuildingId('');
-      setSelectedRoomId('');
+      try {
+        const ok = await api.deleteRoom(parseInt(selectedRoomId));
+        if (ok) {
+          setRooms(prev => prev.filter(room => room.id !== parseInt(selectedRoomId)));
+          alert('Sala eliminada com sucesso!');
+          setActiveAction(null);
+          setSelectedBuildingId('');
+          setSelectedRoomId('');
+        } else {
+          alert('Não foi possível eliminar a sala (poderá ter reservas associadas).');
+        }
+      } catch (error) {
+        console.error('Erro ao eliminar sala:', error);
+        alert('Erro ao eliminar sala.');
+      }
     }
   };
 

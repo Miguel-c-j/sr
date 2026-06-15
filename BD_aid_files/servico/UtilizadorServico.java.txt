@@ -1,0 +1,120 @@
+package com.example.application.BD.servico;
+
+import com.example.application.BD.entidades.Perfil;
+import com.example.application.BD.entidades.Polo;
+import com.example.application.BD.entidades.Utilizador;
+import com.example.application.BD.repositorios.PerfilRepository;
+import com.example.application.BD.repositorios.UtilizadorRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+
+@Service
+@Transactional
+public class UtilizadorServico {
+    private final UtilizadorRepository utilizadorRepository;
+    private final PerfilRepository perfilRepository;
+
+    public UtilizadorServico(UtilizadorRepository userRepository, PerfilRepository perfilRepository) {
+        this.utilizadorRepository = userRepository;
+        this.perfilRepository = perfilRepository;
+    }
+
+    public Utilizador createIfNotExists(String email, String firstName, String lastName, String picture) {
+
+        String domain = email.substring(email.indexOf("@") + 1);
+
+        String perfilNome = domain.equalsIgnoreCase("alunos.uevora.pt")
+                ? "Aluno"
+                : "Docente";
+
+        Perfil perfilUser = perfilRepository.findByNome(perfilNome)
+                .orElseThrow(() -> new RuntimeException("Perfil não existe: " + perfilNome));
+
+        return utilizadorRepository.findByEmail(email).map(user -> {
+
+            user.setFirstName(firstName);
+            user.setLastName(lastName);
+            user.setPictureUrl(picture);
+
+            if (!user.getPerfis().stream().anyMatch(p -> p.getNome().equals("Aluno") || p.getNome().equals("Docente"))
+            ) {
+                user.getPerfis().add(perfilUser);
+            }
+
+            return utilizadorRepository.save(user);
+
+        }).orElseGet(() -> {
+
+            Utilizador user = new Utilizador();
+            user.setEmail(email);
+            user.setFirstName(firstName);
+            user.setLastName(lastName);
+            user.setPictureUrl(picture);
+
+            user.setPerfis(Collections.singleton(perfilUser));
+            
+            return utilizadorRepository.save(user);
+        });
+    }
+
+    public Long getUtilizadorIdPorEmail(String email) {
+        return utilizadorRepository.findByEmail(email)
+                .map(Utilizador::getId)
+                .orElseThrow(() -> new RuntimeException("Utilizador não encontrado para email: " + email));
+    }
+
+    public Utilizador findById(Long id) {
+        return utilizadorRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Utilizador não encontrado para o id: " + id));
+    }
+
+    public Utilizador save(Utilizador utilizador) {
+        return utilizadorRepository.save(utilizador);
+    }
+
+    public void delete(Utilizador user) {
+        utilizadorRepository.delete(user);
+    }
+
+    public List<Utilizador> findAll() {
+        return utilizadorRepository.findAll();
+    }
+
+    public List<Utilizador> findByPerfil() {
+        return utilizadorRepository.findAll()
+                .stream()
+                .filter(u -> u.getPerfis() != null &&
+                        u.getPerfis().stream()
+                                .anyMatch(p ->
+                                        "Secretariado".equals(p.getNome()) ||
+                                                "Admin".equals(p.getNome())
+                                )
+                )
+                .toList();
+    }
+
+    public Optional<Utilizador> findByEmail(String email) {
+        return findAll()
+                .stream()
+                .filter(u -> u.getEmail().equalsIgnoreCase(email))
+                .findFirst();
+    }
+
+    public Polo getPoloPorId(Long utilizadorId) {
+        return utilizadorRepository.findById(utilizadorId)
+                .map(Utilizador::getPolo)
+                .orElseThrow(() -> new RuntimeException("Polo não encontrado para utilizador: " + utilizadorId));
+    }
+
+    public int contarPerfisPorId(Long utilizadorId) {
+        return utilizadorRepository.findById(utilizadorId)
+                .map(u -> u.getPerfis().size())
+                .orElse(0);
+    }
+    
+}

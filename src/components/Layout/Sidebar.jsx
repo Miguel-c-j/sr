@@ -1,5 +1,5 @@
 // src/components/Layout/Sidebar.jsx
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   FaTimes,
@@ -15,14 +15,11 @@ import {
 } from 'react-icons/fa';
 
 const Sidebar = ({ isOpen, onClose }) => {
-  const [menuSections, setMenuSections] = useState([]);
-
-  useEffect(() => {
-    // Obter dados do utilizador logado
+  // Menus definidos uma vez a partir do perfil do utilizador logado.
+  const [menuSections] = useState(() => {
     const userData = JSON.parse(localStorage.getItem('user'));
     const userRole = userData?.role || 'convidado';
 
-    // Definir menus baseados no perfil
     const getMenusByRole = () => {
       switch (userRole) {
         case 'administrador':
@@ -79,8 +76,8 @@ const Sidebar = ({ isOpen, onClose }) => {
       }
     };
 
-    setMenuSections(getMenusByRole());
-  }, []);
+    return getMenusByRole();
+  });
 
   return (
     <>

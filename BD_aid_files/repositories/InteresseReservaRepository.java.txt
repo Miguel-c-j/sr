@@ -1,0 +1,19 @@
+package com.example.application.BD.repositorios;
+
+import com.example.application.BD.entidades.InteresseReserva;
+import com.example.application.BD.entidades.Reserva;
+import com.example.application.BD.entidades.Utilizador;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+public interface InteresseReservaRepository extends JpaRepository<InteresseReserva, Long> {
+
+    List<InteresseReserva> findByReserva(Reserva reserva);
+
+    boolean existsByReservaAndUtilizador(Reserva reserva, Utilizador utilizador);
+
+    @Transactional
+    void deleteByReserva(Reserva reserva);
+}

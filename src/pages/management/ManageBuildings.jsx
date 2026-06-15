@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   FaPlus,
   FaEdit,
@@ -9,41 +9,41 @@ import {
   FaBuilding,
   FaMapMarkerAlt
 } from 'react-icons/fa';
+import api from '../../services/api';
 import '../../styles/management.css';
 
 const ManageBuildings = () => {
   const [buildings, setBuildings] = useState([]);
-  const [filteredBuildings, setFilteredBuildings] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [newBuilding, setNewBuilding] = useState({ name: '', address: '' });
   const [editingId, setEditingId] = useState(null);
   const [editingData, setEditingData] = useState({ name: '', address: '' });
 
-  // Mock data
+  // Carregar edifícios
   useEffect(() => {
-    const mockBuildings = [
-      { id: 1, name: 'Colégio do Espírito Santo', address: 'Largo dos Colegiais, 2', roomCount: 12 },
-      { id: 2, name: 'Colégio Mateus de Aranda', address: 'Rua da Universidade, 1', roomCount: 8 },
-      { id: 3, name: 'Pólo da Mitra', address: 'Estrada da Mitra', roomCount: 5 },
-      { id: 4, name: 'Complexo Desportivo', address: 'Avenida da Universidade', roomCount: 3 },
-      { id: 5, name: 'Biblioteca Central', address: 'Largo dos Colegiais, 10', roomCount: 6 }
-    ];
-    setBuildings(mockBuildings);
-    setFilteredBuildings(mockBuildings);
+    const fetchBuildings = async () => {
+      try {
+        const data = await api.getBuildings();
+        setBuildings(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Erro ao carregar edifícios:', error);
+      }
+    };
+    fetchBuildings();
   }, []);
 
-  // Filter buildings based on search
-  useEffect(() => {
-    const filtered = buildings.filter(b =>
+  // Lista filtrada pela pesquisa (derivada de buildings + searchTerm)
+  const filteredBuildings = useMemo(
+    () => buildings.filter(b =>
       b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       b.address.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredBuildings(filtered);
-  }, [searchTerm, buildings]);
+    ),
+    [buildings, searchTerm]
+  );
 
   // Add new building
-  const handleAddBuilding = () => {
+  const handleAddBuilding = async () => {
     if (!newBuilding.name.trim()) {
       alert('Por favor, insira o nome do edifício.');
       return;
@@ -60,17 +60,23 @@ const ManageBuildings = () => {
       return;
     }
 
-    const buildingToAdd = {
-      id: Math.max(...buildings.map(b => b.id), 0) + 1,
-      name: newBuilding.name.trim(),
-      address: newBuilding.address.trim(),
-      roomCount: 0
-    };
-
-    setBuildings([...buildings, buildingToAdd]);
-    setNewBuilding({ name: '', address: '' });
-    setShowAddForm(false);
-    alert('Edifício adicionado com sucesso!');
+    try {
+      const created = await api.createBuilding({
+        name: newBuilding.name.trim(),
+        address: newBuilding.address.trim()
+      });
+      if (created?.id) {
+        setBuildings(prev => [...prev, created]);
+        setNewBuilding({ name: '', address: '' });
+        setShowAddForm(false);
+        alert('Edifício adicionado com sucesso!');
+      } else {
+        alert('Não foi possível adicionar o edifício.');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar edifício:', error);
+      alert('Erro ao adicionar edifício.');
+    }
   };
 
   // Start editing building
@@ -80,7 +86,7 @@ const ManageBuildings = () => {
   };
 
   // Save edited building
-  const saveEditing = (id) => {
+  const saveEditing = async (id) => {
     if (!editingData.name.trim()) {
       alert('O nome do edifício não pode estar vazio.');
       return;
@@ -97,11 +103,22 @@ const ManageBuildings = () => {
       return;
     }
 
-    setBuildings(prev => prev.map(b =>
-      b.id === id ? { ...b, name: editingData.name.trim(), address: editingData.address.trim() } : b
-    ));
-    setEditingId(null);
-    alert('Edifício atualizado com sucesso!');
+    try {
+      const updated = await api.updateBuilding(id, {
+        name: editingData.name.trim(),
+        address: editingData.address.trim()
+      });
+      if (updated?.id) {
+        setBuildings(prev => prev.map(b => (b.id === id ? { ...b, ...updated } : b)));
+        setEditingId(null);
+        alert('Edifício atualizado com sucesso!');
+      } else {
+        alert('Não foi possível atualizar o edifício.');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar edifício:', error);
+      alert('Erro ao atualizar edifício.');
+    }
   };
 
   // Cancel editing
@@ -110,15 +127,25 @@ const ManageBuildings = () => {
   };
 
   // Delete building
-  const handleDeleteBuilding = (building) => {
+  const handleDeleteBuilding = async (building) => {
     if (building.roomCount > 0) {
       alert(`Não é possível eliminar "${building.name}" pois existem ${building.roomCount} sala(s) associadas. Primeiro, elimine ou mova as salas deste edifício.`);
       return;
     }
 
     if (window.confirm(`Tem certeza que deseja eliminar "${building.name}"? Esta ação não pode ser desfeita.`)) {
-      setBuildings(prev => prev.filter(b => b.id !== building.id));
-      alert('Edifício eliminado com sucesso!');
+      try {
+        const ok = await api.deleteBuilding(building.id);
+        if (ok) {
+          setBuildings(prev => prev.filter(b => b.id !== building.id));
+          alert('Edifício eliminado com sucesso!');
+        } else {
+          alert('Não foi possível eliminar o edifício.');
+        }
+      } catch (error) {
+        console.error('Erro ao eliminar edifício:', error);
+        alert('Erro ao eliminar edifício.');
+      }
     }
   };
 

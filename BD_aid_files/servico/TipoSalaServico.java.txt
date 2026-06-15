@@ -1,0 +1,22 @@
+package com.example.application.BD.servico;
+
+import com.example.application.BD.entidades.TipoSala;
+import com.example.application.BD.repositorios.PoloRepository;
+import com.example.application.BD.repositorios.TipoSalaRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class TipoSalaServico {
+
+    private final TipoSalaRepository tipoSalaRepository;
+
+    public TipoSalaServico(TipoSalaRepository tipoSalaRepository) {
+        this.tipoSalaRepository = tipoSalaRepository;
+    }
+
+    public List<TipoSala> findAll() {
+        return tipoSalaRepository.findAll();
+    }
+}

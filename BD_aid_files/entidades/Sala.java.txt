@@ -1,0 +1,77 @@
+package com.example.application.BD.entidades;
+
+import jakarta.persistence.*;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+public class Sala {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private int numero;
+
+    @ManyToOne
+    @JoinColumn(name = "polo_id")
+    private Polo polo;
+
+    @ManyToOne
+    @JoinColumn(name = "tipo_sala_id")
+    private TipoSala tipo;
+
+    private int lotacao;
+
+    @OneToMany(mappedBy = "sala", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<SalaEquipamento> equipamentos = new ArrayList<>();;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public int getNumero() {
+        return numero;
+    }
+
+    public void setNumero(int numero) {
+        this.numero = numero;
+    }
+
+    public Polo getPolo() {
+        return polo;
+    }
+
+    public void setPolo(Polo polo) {
+        this.polo = polo;
+    }
+
+    public TipoSala getTipo() {
+        return tipo;
+    }
+
+    public void setTipo(TipoSala tipo) {
+        this.tipo = tipo;
+    }
+
+    public int getLotacao() {
+        return lotacao;
+    }
+
+    public void setLotacao(int lotacao) {
+        this.lotacao = lotacao;
+    }
+
+    public List<SalaEquipamento> getEquipamentos() {
+        return equipamentos;
+    }
+
+    public void setEquipamentos(List<SalaEquipamento> equipamentos) {
+        this.equipamentos = equipamentos;
+    }
+}

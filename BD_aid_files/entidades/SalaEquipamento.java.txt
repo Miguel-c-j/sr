@@ -1,0 +1,53 @@
+package com.example.application.BD.entidades;
+
+import jakarta.persistence.*;
+
+@Entity
+public class SalaEquipamento {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "sala_id")
+    private Sala sala;
+
+    @ManyToOne
+    @JoinColumn(name = "equipamento_id")
+    private Equipamentos equipamento;
+
+    private int quantidade;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public int getQuantidade() {
+        return quantidade;
+    }
+
+    public void setQuantidade(int quantidade) {
+        this.quantidade = quantidade;
+    }
+
+    public Equipamentos getEquipamento() {
+        return equipamento;
+    }
+
+    public void setEquipamento(Equipamentos equipamento) {
+        this.equipamento = equipamento;
+    }
+
+    public Sala getSala() {
+        return sala;
+    }
+
+    public void setSala(Sala sala) {
+        this.sala = sala;
+    }
+}

@@ -1,0 +1,145 @@
+package com.example.application.BD.servico;
+
+import com.example.application.BD.entidades.*;
+import com.example.application.BD.repositorios.*;
+import com.example.application.utils.Email;
+import com.example.application.utils.Messages;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+@Service
+public class ReservaServico {
+
+
+    private final ReservaRepository reservaRepository;
+    private final SalaRepository salaRepository;
+    private final EquipamentoRepository equipamentoRepository;
+    private final TipoSalaRepository tipoSalaRepository;
+    private final UtilizadorRepository utilizadorRepository;
+    private final InteresseReservaRepository interesseReservaRepository;
+    private Email email;
+
+    public ReservaServico(ReservaRepository reservaRepository, SalaRepository salaRepository, EquipamentoRepository equipamentoRepository, TipoSalaRepository tipoSalaRepository, UtilizadorRepository utilizadorRepository, InteresseReservaRepository interesseReservaRepository, Email email) {
+        this.reservaRepository = reservaRepository;
+        this.salaRepository = salaRepository;
+        this.equipamentoRepository = equipamentoRepository;
+        this.tipoSalaRepository = tipoSalaRepository;
+        this.utilizadorRepository = utilizadorRepository;
+        this.interesseReservaRepository = interesseReservaRepository;
+        this.email = email;
+    }
+
+    public Reserva adicionarReserva(Reserva reserva) {
+        return reservaRepository.save(reserva);
+    }
+
+    public List<Reserva> getReservasDaSala(Long salaId) {
+        return reservaRepository.findBySalaId(salaId);
+    }
+
+    public List<Reserva> getReservasDaSalaPendenteseConfirmadas(Long salaId) {
+
+        return reservaRepository.findBySalaIdAndEstadoIn(salaId, List.of(Reserva.EstadoReserva.CONFIRMED, Reserva.EstadoReserva.PENDING));
+    }
+
+    public List<Reserva> getReservasPendentes() {
+        return reservaRepository.findByEstado(Reserva.EstadoReserva.PENDING);
+    }
+
+    public List<Reserva> getReservasPendentesPorPolo(Polo polo) {
+        return reservaRepository.findByEstadoAndSala_Polo(Reserva.EstadoReserva.PENDING, polo);
+    }
+
+    public void confirmarReserva(Reserva reserva) {
+        reserva.setEstado(Reserva.EstadoReserva.CONFIRMED);
+        reservaRepository.save(reserva);
+    }
+
+    public void recusarReserva(Reserva reserva) {
+        reserva.setEstado(Reserva.EstadoReserva.REFUSED);
+        reservaRepository.save(reserva);
+    }
+
+    public void removerReserva(Reserva reserva){
+        reservaRepository.delete(reserva);
+    }
+
+    public List<Reserva> getTodasReservas() {
+        return reservaRepository.findAll();
+    }
+
+    public List<Reserva> getReservasDoUtilizador(Long utilizadorId) {
+        return reservaRepository.findByUtilizadorId(utilizadorId);
+    }
+
+    public void atualizarReserva(Reserva reserva){
+        reservaRepository.save(reserva);
+    }
+
+    public Optional<Reserva> findById(Long id){
+        return reservaRepository.findById(id);
+    }
+
+    @Value("${reservas.dias.apagar}")
+    private int diasHistorico;
+    @Scheduled(cron = "0 0 0 * * *")
+    public void apagarReservasAutomatico() {
+
+        LocalDateTime limite = LocalDateTime.now().minusDays(diasHistorico);
+
+        reservaRepository.apagarReservasAntigas(limite);
+    }
+
+    @Transactional
+    public void avisarInteressados(Reserva reserva) {
+
+        List<InteresseReserva> interessados = interesseReservaRepository.findByReserva(reserva);
+
+        for (InteresseReserva interesse : interessados) {
+            try {email.enviarEmailInteressados(interesse.getUtilizador().getEmail(), reserva);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        interesseReservaRepository.deleteByReserva(reserva);
+    }
+
+    @Value("${reservas.dias.aprovacao.automatica}")
+    private int diasAprovacaoAutomatica;
+    @Scheduled(cron = "0 0 0 * * *")
+    public void aprovarReservasAutomaticamente() {
+
+        LocalDateTime limite = LocalDateTime.now().plusDays(diasAprovacaoAutomatica);
+
+        List<Reserva> reservas = reservaRepository.findByEstadoAndInicioLessThanEqual(Reserva.EstadoReserva.PENDING, limite);
+
+        for (Reserva reserva : reservas) {
+
+            reserva.setEstado(Reserva.EstadoReserva.CONFIRMED);
+
+            reservaRepository.save(reserva);
+
+            try {
+                email.enviarEmailConfirmacao(reserva, "Sistema");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}

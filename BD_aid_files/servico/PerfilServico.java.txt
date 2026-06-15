@@ -1,0 +1,42 @@
+package com.example.application.BD.servico;
+
+import com.example.application.BD.entidades.Perfil;
+import com.example.application.BD.repositorios.PerfilRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class PerfilServico {
+
+    private final PerfilRepository perfilRepository;
+
+    public PerfilServico(PerfilRepository perfilRepository) {
+        this.perfilRepository = perfilRepository;
+    }
+
+    public List<Perfil> findAll() {
+        return perfilRepository.findAll();
+    }
+
+    public Optional<Perfil> findById(Long id) {
+        return perfilRepository.findById(id);
+    }
+
+    public Optional<Perfil> findByNome(String nome) {
+        return perfilRepository.findByNome(nome);
+    }
+
+    public Perfil save(Perfil perfil) {
+        return perfilRepository.save(perfil);
+    }
+
+    public void delete(Long id) {
+        perfilRepository.deleteById(id);
+    }
+
+    public boolean existsByNome(String nome) {
+        return perfilRepository.existsByNome(nome);
+    }
+}

@@ -2,7 +2,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaEnvelope, FaUserTag, FaSignInAlt, FaUniversity } from 'react-icons/fa';
+import api from '../services/api';
 import '../styles/login.css';
+
+// Prioridade para escolher o perfil ativo quando o utilizador tem varios.
+const ROLE_PRIORITY = ['administrador', 'secretariado', 'docente', 'aluno', 'convidado'];
+const getPrimaryRole = (profiles = []) =>
+  ROLE_PRIORITY.find(role => profiles.includes(role)) || 'convidado';
 
 const LoginPage = ({ onLogin }) => {
   const navigate = useNavigate();
@@ -57,19 +63,31 @@ const LoginPage = ({ onLogin }) => {
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      const defaultPage = getDefaultPage(role);
+    try {
+      const { ok, data } = await api.login(email);
+
+      if (!ok) {
+        setError(data.detail || 'Não foi possível autenticar. Tente novamente.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Os perfis reais vêm do servidor. O dropdown é apenas a "vista" desejada:
+      // se o utilizador tiver esse perfil usamo-lo, senão usamos o de maior prioridade.
+      const profiles = data.user?.profiles || [];
+      const activeRole = profiles.includes(role) ? role : getPrimaryRole(profiles);
+      const defaultPage = getDefaultPage(activeRole);
 
       const userData = {
-        email: email,
-        role: role,
-        name: getDisplayName(email, role),
-        permissions: getPermissionsByRole(role),
-        buildingAccess: role === 'secretariado' ? [1, 2, 3, 4] : [],
-        defaultPage: defaultPage,
+        ...data.user,
+        role: activeRole,
+        name: data.user?.name || getDisplayName(email, activeRole),
+        permissions: getPermissionsByRole(activeRole),
+        defaultPage,
         loginTime: new Date().toISOString()
       };
 
+      // api.login já guardou tokens e user; gravamos a versão enriquecida.
       localStorage.setItem('user', JSON.stringify(userData));
 
       if (onLogin) {
@@ -77,8 +95,12 @@ const LoginPage = ({ onLogin }) => {
       }
 
       setIsLoading(false);
-      navigate(defaultPage); // Redirecionar para a página correta
-    }, 1500);
+      navigate(defaultPage);
+    } catch (err) {
+      console.error('Erro no login:', err);
+      setError('Erro de ligação ao servidor. Verifique se o backend está a correr.');
+      setIsLoading(false);
+    }
   };
 
   const getDisplayName = (email, role) => {

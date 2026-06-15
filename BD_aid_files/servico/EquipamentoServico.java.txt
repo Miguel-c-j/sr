@@ -1,0 +1,22 @@
+package com.example.application.BD.servico;
+
+import com.example.application.BD.entidades.Equipamentos;
+import com.example.application.BD.repositorios.EquipamentoRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class EquipamentoServico {
+
+    private final EquipamentoRepository equipamentoRepository;
+
+    public EquipamentoServico(EquipamentoRepository equipamentoRepository) {
+        this.equipamentoRepository = equipamentoRepository;
+    }
+
+        public List<Equipamentos> findAll() {
+        return equipamentoRepository.findAll();
+    }
+
+}

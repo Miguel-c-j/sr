@@ -51,6 +51,14 @@ const api = {
     return response.json();
   },
 
+  deleteUser: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/users/${id}/`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return response.ok;
+  },
+
   // Buildings
   getBuildings: async () => {
     const response = await fetch(`${API_BASE_URL}/buildings/`, {
@@ -208,7 +216,41 @@ const api = {
       body: JSON.stringify({ reason })
     });
     return response.json();
-  }
+  },
+
+  // Secretariado: pedidos pendentes
+  getPendingReservations: async (filters = {}) => {
+    const params = new URLSearchParams(filters).toString();
+    const response = await fetch(`${API_BASE_URL}/reservations/pending/?${params}`, {
+      headers: getHeaders()
+    });
+    return response.json();
+  },
+
+  // Secretariado: histórico de reservas (filtros: buildingId, roomId, search, startDate, endDate, sortOrder)
+  getReservationHistory: async (filters = {}) => {
+    const params = new URLSearchParams(filters).toString();
+    const response = await fetch(`${API_BASE_URL}/reservations/history/?${params}`, {
+      headers: getHeaders()
+    });
+    return response.json();
+  },
+
+  // Secretariado: importar CSV (type: horarios_aulas | horarios_exames | calendario_letivo)
+  importData: async (type, file) => {
+    const formData = new FormData();
+    formData.append('type', type);
+    formData.append('file', file);
+    const response = await fetch(`${API_BASE_URL}/imports/`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${getToken()}` },
+      body: formData
+    });
+    return response.json();
+  },
+
+  // URL do template CSV (endpoint público, abre diretamente no browser)
+  templateUrl: (type) => `${API_BASE_URL}/imports/template/?type=${type}`
 };
 
 export default api;

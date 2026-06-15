@@ -14,6 +14,7 @@ import {
   FaEnvelope,
   FaDownload
 } from 'react-icons/fa';
+import api from '../../services/api';
 import '../../styles/secretariat.css';
 
 const History = () => {
@@ -36,141 +37,34 @@ const History = () => {
 
   const [selectAll, setSelectAll] = useState(false);
 
-  // Mock data
+  // Carregar edifícios, salas (agrupadas por edifício) e histórico
   useEffect(() => {
-    // Mock buildings
-    const mockBuildings = [
-      { id: 1, name: 'Colégio do Espírito Santo' },
-      { id: 2, name: 'Colégio Mateus de Aranda' },
-      { id: 3, name: 'Pólo da Mitra' },
-      { id: 4, name: 'Complexo Desportivo' }
-    ];
+    const fetchData = async () => {
+      try {
+        const [buildingsData, roomsData, historyData] = await Promise.all([
+          api.getBuildings(),
+          api.getRooms(),
+          api.getReservationHistory()
+        ]);
 
-    // Mock rooms
-    const mockRooms = {
-      1: [
-        { id: 101, name: 'Sala 101', buildingId: 1 },
-        { id: 102, name: 'Sala 102', buildingId: 1 },
-        { id: 103, name: 'Laboratório 202', buildingId: 1 }
-      ],
-      2: [
-        { id: 201, name: 'Sala de Reuniões 305', buildingId: 2 },
-        { id: 202, name: 'Sala 201', buildingId: 2 }
-      ],
-      3: [
-        { id: 301, name: 'Sala 001', buildingId: 3 },
-        { id: 302, name: 'Sala 002', buildingId: 3 }
-      ],
-      4: [
-        { id: 401, name: 'Auditório', buildingId: 4 },
-        { id: 402, name: 'Sala de Dança', buildingId: 4 }
-      ]
-    };
+        setBuildings(Array.isArray(buildingsData) ? buildingsData : []);
 
-    // Mock reservations (últimos 3 meses)
-    const mockReservations = [
-      {
-        id: 1,
-        sala: { id: 101, name: 'Sala 101', buildingId: 1, buildingName: 'Colégio do Espírito Santo' },
-        solicitante: { nome: 'Prof. Ana Silva', email: 'ana.silva@uevora.pt', tipo: 'docente' },
-        data: '2026-03-15',
-        horaInicio: '09:00',
-        horaFim: '11:00',
-        duracao: '2 horas',
-        proposito: 'Aula de Programação Web - Exame Final',
-        estado: 'confirmada',
-        criadoEm: '2026-03-01T10:00:00'
-      },
-      {
-        id: 2,
-        sala: { id: 103, name: 'Laboratório 202', buildingId: 1, buildingName: 'Colégio do Espírito Santo' },
-        solicitante: { nome: 'Dr. Carlos Santos', email: 'carlos.santos@uevora.pt', tipo: 'docente' },
-        data: '2026-03-20',
-        horaInicio: '14:00',
-        horaFim: '17:00',
-        duracao: '3 horas',
-        proposito: 'Experiências de Química - Laboratório Prático',
-        estado: 'confirmada',
-        criadoEm: '2026-03-05T14:15:00'
-      },
-      {
-        id: 3,
-        sala: { id: 201, name: 'Sala de Reuniões 305', buildingId: 2, buildingName: 'Colégio Mateus de Aranda' },
-        solicitante: { nome: 'Maria Oliveira', email: 'maria.oliveira@alunos.uevora.pt', tipo: 'estudante' },
-        data: '2026-03-25',
-        horaInicio: '10:00',
-        horaFim: '12:00',
-        duracao: '2 horas',
-        proposito: 'Reunião de Grupo - Projeto Final de Curso',
-        estado: 'confirmada',
-        criadoEm: '2026-03-10T11:00:00'
-      },
-      {
-        id: 4,
-        sala: { id: 401, name: 'Auditório', buildingId: 4, buildingName: 'Complexo Desportivo' },
-        solicitante: { nome: 'Prof. João Mendes', email: 'joao.mendes@uevora.pt', tipo: 'docente' },
-        data: '2026-03-28',
-        horaInicio: '09:00',
-        horaFim: '13:00',
-        duracao: '4 horas',
-        proposito: 'Palestra sobre Inovação Tecnológica',
-        estado: 'confirmada',
-        criadoEm: '2026-03-15T08:45:00'
-      },
-      {
-        id: 5,
-        sala: { id: 102, name: 'Sala 102', buildingId: 1, buildingName: 'Colégio do Espírito Santo' },
-        solicitante: { nome: 'Teresa Costa', email: 'teresa.costa@alunos.uevora.pt', tipo: 'estudante' },
-        data: '2026-04-05',
-        horaInicio: '15:00',
-        horaFim: '17:00',
-        duracao: '2 horas',
-        proposito: 'Estudo em Grupo - Preparação para Exames',
-        estado: 'confirmada',
-        criadoEm: '2026-03-20T16:30:00'
-      },
-      {
-        id: 6,
-        sala: { id: 202, name: 'Sala 201', buildingId: 2, buildingName: 'Colégio Mateus de Aranda' },
-        solicitante: { nome: 'Prof. António Pereira', email: 'antonio.pereira@uevora.pt', tipo: 'docente' },
-        data: '2026-04-10',
-        horaInicio: '11:00',
-        horaFim: '13:00',
-        duracao: '2 horas',
-        proposito: 'Aula de Matemática Discreta',
-        estado: 'cancelada',
-        criadoEm: '2026-03-25T09:20:00'
-      },
-      {
-        id: 7,
-        sala: { id: 301, name: 'Sala 001', buildingId: 3, buildingName: 'Pólo da Mitra' },
-        solicitante: { nome: 'Dra. Sofia Rodrigues', email: 'sofia.rodrigues@uevora.pt', tipo: 'docente' },
-        data: '2026-04-12',
-        horaInicio: '08:00',
-        horaFim: '10:00',
-        duracao: '2 horas',
-        proposito: 'Exame de Física - Época Normal',
-        estado: 'confirmada',
-        criadoEm: '2026-03-28T14:00:00'
-      },
-      {
-        id: 8,
-        sala: { id: 402, name: 'Sala de Dança', buildingId: 4, buildingName: 'Complexo Desportivo' },
-        solicitante: { nome: 'Carlos Ferreira', email: 'carlos.ferreira@alunos.uevora.pt', tipo: 'estudante' },
-        data: '2026-04-18',
-        horaInicio: '16:00',
-        horaFim: '18:00',
-        duracao: '2 horas',
-        proposito: 'Ensaio de Grupo de Teatro',
-        estado: 'confirmada',
-        criadoEm: '2026-04-01T17:45:00'
+        // Agrupar salas por edifício no formato { [buildingId]: [{id, name, buildingId}] }
+        const grouped = {};
+        (Array.isArray(roomsData) ? roomsData : []).forEach(room => {
+          if (!grouped[room.buildingId]) grouped[room.buildingId] = [];
+          grouped[room.buildingId].push({ id: room.id, name: room.name, buildingId: room.buildingId });
+        });
+        setRooms(grouped);
+
+        setReservations(Array.isArray(historyData) ? historyData : []);
+      } catch (error) {
+        console.error('Erro ao carregar histórico:', error);
+      } finally {
+        setIsLoading(false);
       }
-    ];
-
-    setBuildings(mockBuildings);
-    setRooms(mockRooms);
-    setReservations(mockReservations);
-    setIsLoading(false);
+    };
+    fetchData();
   }, []);
 
   // Atualizar lista de salas quando edifício muda

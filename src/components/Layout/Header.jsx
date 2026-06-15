@@ -1,20 +1,22 @@
 // src/components/Layout/Header.jsx
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaBars, FaUser, FaSignOutAlt, FaChevronDown } from 'react-icons/fa';
+import api from '../../services/api';
 
 const Header = ({ onMenuClick }) => {
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [userData, setUserData] = useState(null);
-
-  useEffect(() => {
-    const data = JSON.parse(localStorage.getItem('user'));
-    setUserData(data);
-  }, []);
+  const [userData] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user'));
+    } catch {
+      return null;
+    }
+  });
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
+    api.logout(); // remove tokens e user
     navigate('/login');
     setShowUserMenu(false);
   };

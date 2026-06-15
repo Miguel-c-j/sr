@@ -1,0 +1,13 @@
+package com.example.application.BD.repositorios;
+
+import com.example.application.BD.entidades.TipoSala;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface TipoSalaRepository extends JpaRepository<TipoSala, Long> {
+    Optional<TipoSala> findById(Long tiposalaid);
+    Optional<TipoSala> findByNome(String nome);
+}

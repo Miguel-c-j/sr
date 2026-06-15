@@ -12,6 +12,7 @@ import {
   FaSortAmountDown,
   FaSortAmountUp
 } from 'react-icons/fa';
+import api from '../services/api';
 import '../styles/reservations-page.css';
 
 const ReservationsPage = () => {
@@ -28,119 +29,20 @@ const ReservationsPage = () => {
     dateRange: 'todas' // todas, esteMes, proximoMes
   });
 
-  // Mock data - será substituído pela API real
+  // Carregar reservas do utilizador autenticado
   useEffect(() => {
-    // Simular carregamento de dados da API
-    setTimeout(() => {
-      const mockReservations = [
-        {
-          id: 1,
-          sala: {
-            id: 101,
-            nome: "Sala 101",
-            edificio: "Colégio do Espírito Santo",
-            capacidade: 30,
-            tipo: "aula"
-          },
-          data: "2026-04-20",
-          horaInicio: "09:00",
-          horaFim: "11:00",
-          estado: "confirmada",
-          proposito: "Aula de Programação Web",
-          criadoEm: "2026-04-01T10:00:00",
-          ultimaAtualizacao: "2026-04-01T10:30:00"
-        },
-        {
-          id: 2,
-          sala: {
-            id: 102,
-            nome: "Laboratório 202",
-            edificio: "Colégio do Espírito Santo",
-            capacidade: 20,
-            tipo: "laboratorio"
-          },
-          data: "2026-04-22",
-          horaInicio: "14:00",
-          horaFim: "17:00",
-          estado: "pendente",
-          proposito: "Trabalho de Grupo - IA",
-          criadoEm: "2026-04-02T14:30:00",
-          ultimaAtualizacao: "2026-04-02T14:30:00"
-        },
-        {
-          id: 3,
-          sala: {
-            id: 201,
-            nome: "Auditório",
-            edificio: "Complexo Desportivo",
-            capacidade: 150,
-            tipo: "reuniao"
-          },
-          data: "2026-04-15",
-          horaInicio: "10:00",
-          horaFim: "12:00",
-          estado: "cancelada",
-          proposito: "Palestra Convidada",
-          criadoEm: "2026-03-28T09:00:00",
-          ultimaAtualizacao: "2026-04-10T15:20:00"
-        },
-        {
-          id: 4,
-          sala: {
-            id: 104,
-            nome: "Sala 104",
-            edificio: "Colégio Mateus de Aranda",
-            capacidade: 25,
-            tipo: "reuniao"
-          },
-          data: "2026-05-05",
-          horaInicio: "15:30",
-          horaFim: "17:30",
-          estado: "confirmada",
-          proposito: "Reunião de Projeto",
-          criadoEm: "2026-04-05T11:00:00",
-          ultimaAtualizacao: "2026-04-05T11:15:00"
-        },
-        {
-          id: 5,
-          sala: {
-            id: 105,
-            nome: "Sala 205",
-            edificio: "Colégio do Espírito Santo",
-            capacidade: 40,
-            tipo: "aula"
-          },
-          data: "2026-04-18",
-          horaInicio: "08:00",
-          horaFim: "10:00",
-          estado: "rejeitada",
-          proposito: "Aula de Matemática",
-          criadoEm: "2026-04-03T08:30:00",
-          ultimaAtualizacao: "2026-04-04T09:00:00",
-          motivoRejeicao: "Conflito com evento institucional"
-        },
-        {
-          id: 6,
-          sala: {
-            id: 106,
-            nome: "Sala 306",
-            edificio: "Pólo da Mitra",
-            capacidade: 35,
-            tipo: "laboratorio"
-          },
-          data: "2026-04-25",
-          horaInicio: "13:00",
-          horaFim: "16:00",
-          estado: "pendente",
-          proposito: "Experiências de Química",
-          criadoEm: "2026-04-06T16:00:00",
-          ultimaAtualizacao: "2026-04-06T16:00:00"
-        }
-      ];
-      
-      setReservations(mockReservations);
-      setIsLoading(false);
-    }, 500);
+    const fetchReservations = async () => {
+      try {
+        const data = await api.getUserReservations();
+        setReservations(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Erro ao carregar reservas:', error);
+        setReservations([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchReservations();
   }, []);
 
   // Aplicar filtros quando mudarem
@@ -164,8 +66,7 @@ const ReservationsPage = () => {
 
     // Filtrar por período
     const hoje = new Date();
-    const currentDate = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-    
+
     if (filters.dateRange === 'esteMes') {
       const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
       const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
@@ -192,18 +93,17 @@ const ReservationsPage = () => {
   const handleCancelReservation = async (reservationId) => {
     if (window.confirm('Tem certeza que deseja cancelar esta reserva?')) {
       try {
-        // TODO: Chamar API para cancelar reserva
-        // await api.cancelReservation(reservationId);
-        
-        // Atualizar estado local
-        setReservations(prev => 
-          prev.map(res => 
-            res.id === reservationId 
-              ? { ...res, estado: 'cancelada' }
+        const result = await api.cancelReservation(reservationId);
+        const novoEstado = result?.estado || 'cancelada';
+
+        setReservations(prev =>
+          prev.map(res =>
+            res.id === reservationId
+              ? { ...res, estado: novoEstado }
               : res
           )
         );
-        
+
         alert('Reserva cancelada com sucesso!');
       } catch (error) {
         console.error('Erro ao cancelar reserva:', error);

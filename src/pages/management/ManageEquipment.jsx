@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   FaPlus,
   FaEdit,
@@ -7,11 +7,11 @@ import {
   FaTimes,
   FaSearch
 } from 'react-icons/fa';
+import api from '../../services/api';
 import '../../styles/management.css';
 
 const ManageEquipment = () => {
   const [equipment, setEquipment] = useState([]);
-  const [filteredEquipment, setFilteredEquipment] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
@@ -20,29 +20,26 @@ const ManageEquipment = () => {
   const [showModal, setShowModal] = useState(false);
   const [newEquipmentName, setNewEquipmentName] = useState('');
 
-  // Mock data
+  // Carregar equipamentos
   useEffect(() => {
-    const mockEquipment = [
-      { id: 1, name: 'Projetor', icon: '📽️', usageCount: 45 },
-      { id: 2, name: 'Quadro Branco', icon: '📋', usageCount: 52 },
-      { id: 3, name: 'WiFi', icon: '📶', usageCount: 78 },
-      { id: 4, name: 'Sistema de Som', icon: '🔊', usageCount: 23 },
-      { id: 5, name: 'Computadores', icon: '💻', usageCount: 34 },
-      { id: 6, name: 'Ar Condicionado', icon: '❄️', usageCount: 41 },
-      { id: 7, name: 'Videoconferência', icon: '🎥', usageCount: 18 },
-      { id: 8, name: 'Quadro Interativo', icon: '🖥️', usageCount: 12 }
-    ];
-    setEquipment(mockEquipment);
-    setFilteredEquipment(mockEquipment);
+    const fetchEquipment = async () => {
+      try {
+        const data = await api.getEquipment();
+        setEquipment(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Erro ao carregar equipamentos:', error);
+      }
+    };
+    fetchEquipment();
   }, []);
 
-  // Filter equipment based on search
-  useEffect(() => {
-    const filtered = equipment.filter(eq =>
+  // Lista filtrada pela pesquisa (derivada de equipment + searchTerm)
+  const filteredEquipment = useMemo(
+    () => equipment.filter(eq =>
       eq.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredEquipment(filtered);
-  }, [searchTerm, equipment]);
+    ),
+    [equipment, searchTerm]
+  );
 
   // Open modal
   const handleOpenModal = () => {
@@ -57,7 +54,7 @@ const ManageEquipment = () => {
   };
 
   // Add new equipment
-  const handleAddEquipment = () => {
+  const handleAddEquipment = async () => {
     if (!newEquipmentName.trim()) {
       alert('Por favor, insira o nome do equipamento.');
       return;
@@ -69,16 +66,19 @@ const ManageEquipment = () => {
       return;
     }
 
-    const newEquipment = {
-      id: Math.max(...equipment.map(e => e.id), 0) + 1,
-      name: newEquipmentName.trim(),
-      icon: '🔧',
-      usageCount: 0
-    };
-
-    setEquipment([...equipment, newEquipment]);
-    handleCloseModal();
-    alert('Equipamento adicionado com sucesso!');
+    try {
+      const created = await api.createEquipment({ name: newEquipmentName.trim() });
+      if (created?.id) {
+        setEquipment(prev => [...prev, created]);
+        handleCloseModal();
+        alert('Equipamento adicionado com sucesso!');
+      } else {
+        alert('Não foi possível adicionar o equipamento.');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar equipamento:', error);
+      alert('Erro ao adicionar equipamento.');
+    }
   };
 
   // Start editing equipment
@@ -88,7 +88,7 @@ const ManageEquipment = () => {
   };
 
   // Save edited equipment
-  const saveEditing = () => {
+  const saveEditing = async () => {
     if (!editingName.trim()) {
       alert('O nome do equipamento não pode estar vazio.');
       return;
@@ -100,12 +100,20 @@ const ManageEquipment = () => {
       return;
     }
 
-    setEquipment(prev => prev.map(eq =>
-      eq.id === editingId ? { ...eq, name: editingName.trim() } : eq
-    ));
-    setEditingId(null);
-    setEditingName('');
-    alert('Equipamento atualizado com sucesso!');
+    try {
+      const updated = await api.updateEquipment(editingId, { name: editingName.trim() });
+      if (updated?.id) {
+        setEquipment(prev => prev.map(eq => (eq.id === editingId ? { ...eq, ...updated } : eq)));
+        setEditingId(null);
+        setEditingName('');
+        alert('Equipamento atualizado com sucesso!');
+      } else {
+        alert('Não foi possível atualizar o equipamento.');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar equipamento:', error);
+      alert('Erro ao atualizar equipamento.');
+    }
   };
 
   // Cancel editing
@@ -115,9 +123,9 @@ const ManageEquipment = () => {
   };
 
   // Delete equipment
-  const handleDeleteEquipment = (eq) => {
+  const handleDeleteEquipment = async (eq) => {
     // Check if equipment is used in any room
-    const isUsed = eq.usageCount > 0; // Simulated check
+    const isUsed = eq.usageCount > 0;
 
     if (isUsed) {
       alert(`Não é possível eliminar "${eq.name}" pois está associado a ${eq.usageCount} sala(s).`);
@@ -125,8 +133,18 @@ const ManageEquipment = () => {
     }
 
     if (window.confirm(`Tem certeza que deseja eliminar "${eq.name}"?`)) {
-      setEquipment(prev => prev.filter(e => e.id !== eq.id));
-      alert('Equipamento eliminado com sucesso!');
+      try {
+        const ok = await api.deleteEquipment(eq.id);
+        if (ok) {
+          setEquipment(prev => prev.filter(e => e.id !== eq.id));
+          alert('Equipamento eliminado com sucesso!');
+        } else {
+          alert('Não foi possível eliminar o equipamento.');
+        }
+      } catch (error) {
+        console.error('Erro ao eliminar equipamento:', error);
+        alert('Erro ao eliminar equipamento.');
+      }
     }
   };
 

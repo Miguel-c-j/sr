@@ -1,0 +1,47 @@
+package com.example.application.BD.repositorios;
+
+import com.example.application.BD.entidades.Polo;
+import com.example.application.BD.entidades.Sala;
+import com.example.application.BD.entidades.TipoSala;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface SalaRepository extends JpaRepository<Sala, Long> {
+    List<Sala> findByPolo(String polo);
+
+    @Query("""
+SELECT s FROM Sala s
+LEFT JOIN s.equipamentos se
+LEFT JOIN se.equipamento e
+WHERE (:polo IS NULL OR s.polo = :polo)
+AND (:tipo IS NULL OR s.tipo = :tipo)
+AND (:lotacao IS NULL OR s.lotacao >= :lotacao)
+AND (:equipamentos IS NULL OR e.nome IN :equipamentos)
+GROUP BY s
+HAVING (:equipamentos IS NULL OR COUNT(DISTINCT e.nome) >= :equipamentosCount)
+""")
+    List<Sala> filtrarSalas(
+            @Param("polo") Polo polo,
+            @Param("tipo") TipoSala tipo,
+            @Param("lotacao") Integer lotacao,
+            @Param("equipamentos") List<String> equipamentos,
+            @Param("equipamentosCount") Long equipamentosCount
+    );
+
+    @Query("""
+    SELECT s 
+    FROM Sala s 
+    WHERE (:numero IS NULL OR s.numero = :numero)
+""")
+    List<Sala> filtrarPorNumero(@Param("numero") Integer numero);
+
+    @Query("SELECT s FROM Sala s WHERE s.numero = :numero AND s.polo = :polo")
+    List<Sala> filtrarPorNumeroEPolo(Integer numero, Polo polo);
+
+    Optional<Sala> findByPolo_NomeAndTipo_NomeAndNumero(String poloNome, String tipoNome, Integer numero);}

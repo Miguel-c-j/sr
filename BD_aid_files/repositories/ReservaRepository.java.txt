@@ -1,0 +1,46 @@
+package com.example.application.BD.repositorios;
+
+import com.example.application.BD.entidades.Polo;
+import com.example.application.BD.entidades.Reserva;
+import com.example.application.BD.entidades.Sala;
+import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface ReservaRepository extends JpaRepository<Reserva, Long> {
+    List<Reserva> findByUtilizadorId(Long utilizadorId);
+    List<Reserva> findByUtilizadorIdOrderByInicioAsc(Long utilizadorId);
+    List<Reserva> findBySalaId(Long salaId);
+    List<Reserva> findByEstado(Reserva.EstadoReserva estado);
+
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM Reserva r WHERE r.fim < :limite")
+    void apagarReservasAntigas(@Param("limite") LocalDateTime limite);
+
+    List<Reserva> findByUtilizadorIdAndEstado(Long utilizadorId, Reserva.EstadoReserva estado);
+    List<Reserva> findByUtilizadorIdAndEstadoOrderByInicioAsc(Long utilizadorId, Reserva.EstadoReserva estado);
+
+    List<Reserva> findByEstadoAndSala_Polo(Reserva.EstadoReserva estado, Polo polo);
+
+    List<Reserva> findBySalaAndInicioLessThanAndFimGreaterThan(Sala sala, LocalDateTime fim, LocalDateTime inicio);
+
+    List<Reserva> findBySalaIdAndEstadoIn(Long salaId, List<Reserva.EstadoReserva> estados);
+
+    Page<Reserva> findAllByOrderByIdDesc(Pageable pageable);
+
+    Page<Reserva> findByEstadoOrderByIdDesc(Reserva.EstadoReserva estado, Pageable pageable);
+
+    List<Reserva> findByEstadoAndInicioLessThanEqual(Reserva.EstadoReserva estado, LocalDateTime limite);
+
+    List<Reserva> findByUtilizadorIdAndFimAfterOrderByInicioAsc(Long utilizadorId, LocalDateTime dataLimite);
+
+    List<Reserva> findByUtilizadorIdAndEstadoAndFimAfterOrderByInicioAsc(Long utilizadorId, Reserva.EstadoReserva estado, LocalDateTime dataLimite);
+}

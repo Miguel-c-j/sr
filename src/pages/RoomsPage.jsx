@@ -3,8 +3,18 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import RoomFilters from '../components/Filters/RoomFilters';
 import RoomCard from '../components/Rooms/RoomCard';
+import api from '../services/api';
 import '../styles/rooms-page.css';
 import '../styles/room-schedule.css';
+
+// Soma minutos a uma hora "HH:MM" e devolve "HH:MM".
+const addMinutes = (time, minutesToAdd) => {
+  const [h, m] = time.split(':').map(Number);
+  const total = h * 60 + m + minutesToAdd;
+  const hh = String(Math.floor(total / 60)).padStart(2, '0');
+  const mm = String(total % 60).padStart(2, '0');
+  return `${hh}:${mm}`;
+};
 
 const RoomsPage = () => {
   const location = useLocation();
@@ -29,126 +39,6 @@ const RoomsPage = () => {
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Mock data for rooms with complete schedule
-  const mockRoomsData = [
-    {
-      id: 1,
-      name: "Sala 101",
-      building: "Colégio do Espírito Santo",
-      capacity: 30,
-      type: "aula",
-      equipment: ["projetor", "quadro", "wifi"],
-      schedule: {
-        "08:00": "livre",
-        "08:30": "livre",
-        "09:00": "ocupado",
-        "09:30": "ocupado",
-        "10:00": "livre",
-        "10:30": "livre",
-        "11:00": "livre",
-        "11:30": "reservado",
-        "12:00": "reservado",
-        "12:30": "livre",
-        "13:00": "livre",
-        "13:30": "livre",
-        "14:00": "ocupado",
-        "14:30": "ocupado",
-        "15:00": "livre",
-        "15:30": "livre",
-        "16:00": "livre",
-        "16:30": "livre",
-        "17:00": "livre",
-        "17:30": "livre",
-        "18:00": "livre",
-        "18:30": "livre",
-        "19:00": "livre",
-        "19:30": "livre",
-        "20:00": "livre",
-        "20:30": "livre",
-        "21:00": "livre",
-        "21:30": "livre",
-        "22:00": "livre"
-      }
-    },
-    {
-      id: 2,
-      name: "Laboratório 202",
-      building: "Colégio do Espírito Santo",
-      capacity: 20,
-      type: "laboratorio",
-      equipment: ["computadores", "projetor", "wifi"],
-      schedule: {
-        "08:00": "livre",
-        "08:30": "ocupado",
-        "09:00": "ocupado",
-        "09:30": "livre",
-        "10:00": "livre",
-        "10:30": "livre",
-        "11:00": "livre",
-        "11:30": "ocupado",
-        "12:00": "ocupado",
-        "12:30": "livre",
-        "13:00": "livre",
-        "13:30": "reservado",
-        "14:00": "reservado",
-        "14:30": "livre",
-        "15:00": "livre",
-        "15:30": "livre",
-        "16:00": "livre",
-        "16:30": "livre",
-        "17:00": "ocupado",
-        "17:30": "ocupado",
-        "18:00": "livre",
-        "18:30": "livre",
-        "19:00": "livre",
-        "19:30": "livre",
-        "20:00": "livre",
-        "20:30": "livre",
-        "21:00": "livre",
-        "21:30": "livre",
-        "22:00": "livre"
-      }
-    },
-    {
-      id: 3,
-      name: "Sala de Reuniões 305",
-      building: "Colégio Mateus de Aranda",
-      capacity: 15,
-      type: "reuniao",
-      equipment: ["videoconferencia", "wifi", "quadro"],
-      schedule: {
-        "08:00": "livre",
-        "08:30": "livre",
-        "09:00": "livre",
-        "09:30": "reservado",
-        "10:00": "reservado",
-        "10:30": "ocupado",
-        "11:00": "ocupado",
-        "11:30": "livre",
-        "12:00": "livre",
-        "12:30": "livre",
-        "13:00": "livre",
-        "13:30": "livre",
-        "14:00": "livre",
-        "14:30": "livre",
-        "15:00": "reservado",
-        "15:30": "reservado",
-        "16:00": "livre",
-        "16:30": "livre",
-        "17:00": "livre",
-        "17:30": "livre",
-        "18:00": "livre",
-        "18:30": "livre",
-        "19:00": "livre",
-        "19:30": "livre",
-        "20:00": "livre",
-        "20:30": "livre",
-        "21:00": "livre",
-        "21:30": "livre",
-        "22:00": "livre"
-      }
-    }
-  ];
 
   // Verificar se veio da página de reservas para editar
   useEffect(() => {
@@ -170,6 +60,8 @@ const RoomsPage = () => {
 
     window.addEventListener('openQuickReserve', handleQuickReserve);
     return () => window.removeEventListener('openQuickReserve', handleQuickReserve);
+    // Subscrição única ao montar; handleSearch é estável o suficiente para este uso.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const requiredFiltersFilled = (currentFilters = filters) => {
@@ -185,53 +77,24 @@ const RoomsPage = () => {
     setHasSearched(true);
 
     try {
-      // Simular API call
-      setTimeout(() => {
-        // Filtrar salas baseado nos filtros
-        let filteredRooms = [...mockRoomsData];
+      const data = await api.getRooms(searchFilters);
+      const foundRooms = Array.isArray(data) ? data : [];
+      setRooms(foundRooms);
 
-        // Filtrar por edifício
-        if (searchFilters.building) {
-          filteredRooms = filteredRooms.filter(room => room.building === searchFilters.building);
+      if (isQuickReserve && foundRooms.length > 0) {
+        const firstRoom = foundRooms[0];
+        const schedule = firstRoom.schedule || {};
+        const availableSlots = Object.keys(schedule).filter(time => schedule[time] === 'livre');
+        if (availableSlots.length > 0) {
+          setSelectedRoom(firstRoom);
+          setSelectedSlots([availableSlots[0]]);
+          setShowReserveModal(true);
         }
-
-        // Filtrar por capacidade
-        if (searchFilters.minCapacity) {
-          filteredRooms = filteredRooms.filter(room => room.capacity >= parseInt(searchFilters.minCapacity));
-        }
-
-        // Filtrar por sala específica
-        if (searchFilters.room) {
-          filteredRooms = filteredRooms.filter(room => room.name === searchFilters.room);
-        }
-
-        // Filtrar por tipo de sala
-        if (searchFilters.roomTypes && searchFilters.roomTypes.length > 0) {
-          filteredRooms = filteredRooms.filter(room => searchFilters.roomTypes.includes(room.type));
-        }
-
-        // Filtrar por equipamentos
-        if (searchFilters.equipment && searchFilters.equipment.length > 0) {
-          filteredRooms = filteredRooms.filter(room =>
-            searchFilters.equipment.some(equip => room.equipment.includes(equip))
-          );
-        }
-
-        setRooms(filteredRooms);
-        setIsLoading(false);
-
-        if (isQuickReserve && filteredRooms.length > 0) {
-          const firstRoom = filteredRooms[0];
-          const availableSlots = Object.keys(firstRoom.schedule).filter(time => firstRoom.schedule[time] === 'livre');
-          if (availableSlots.length > 0) {
-            setSelectedRoom(firstRoom);
-            setSelectedSlots([availableSlots[0]]);
-            setShowReserveModal(true);
-          }
-        }
-      }, 500);
+      }
     } catch (error) {
       console.error("Error searching rooms:", error);
+      setRooms([]);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -258,17 +121,41 @@ const RoomsPage = () => {
     setShowReserveModal(true);
   };
 
-  const handleConfirmReserve = () => {
+  const handleConfirmReserve = async () => {
     if (!reservePurpose.trim()) {
       alert('Por favor, descreva o propósito da reserva.');
       return;
     }
 
-    alert(`Reserva confirmada!\n\nSala: ${selectedRoom.name}\nData: ${filters.date}\nHorário: ${selectedSlots[0]} - ${selectedSlots[selectedSlots.length - 1]}\nPropósito: ${reservePurpose}`);
-    setShowReserveModal(false);
-    setReservePurpose('');
-    setSelectedRoom(null);
-    setSelectedSlots([]);
+    // Os slots são marcas de 30 min; o fim é o último slot + 30 min.
+    const horaInicio = selectedSlots[0];
+    const horaFim = addMinutes(selectedSlots[selectedSlots.length - 1], 30);
+
+    try {
+      const result = await api.createReservation({
+        roomId: selectedRoom.id,
+        data: filters.date,
+        horaInicio,
+        horaFim,
+        proposito: reservePurpose
+      });
+
+      if (result && result.id) {
+        alert('Reserva submetida com sucesso! Aguarda aprovação do secretariado.');
+        setShowReserveModal(false);
+        setReservePurpose('');
+        setSelectedRoom(null);
+        setSelectedSlots([]);
+        // Atualizar a grelha de horários
+        handleSearch(filters);
+      } else {
+        const msg = result?.non_field_errors?.[0] || result?.detail || 'Não foi possível criar a reserva.';
+        alert(msg);
+      }
+    } catch (error) {
+      console.error('Erro ao criar reserva:', error);
+      alert('Erro de ligação ao servidor.');
+    }
   };
 
   return (

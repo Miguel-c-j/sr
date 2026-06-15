@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   FaEdit,
   FaTrash,
@@ -16,15 +16,23 @@ import {
   FaUserTie,
   FaUserCog
 } from 'react-icons/fa';
+import api from '../../services/api';
 import '../../styles/management.css';
 
 const ManageUsers = () => {
   const [users, setUsers] = useState([]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [buildings, setBuildings] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingPermissions, setEditingPermissions] = useState(null);
-  const [currentAdminId, setCurrentAdminId] = useState(1); // Simulated current admin ID
+  // Id do admin autenticado (vindo do login) para impedir auto-remoção
+  const [currentAdminId] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user'))?.id ?? null;
+    } catch {
+      return null;
+    }
+  });
 
   // Estado para o modal de eliminação
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -38,118 +46,40 @@ const ManageUsers = () => {
     { id: 'administrador', label: 'Administrador', icon: '⚙️', description: 'Acesso total ao sistema', level: 4, color: '#dc3545' }
   ];
 
-  // Mock data
+  // Carregar utilizadores
   useEffect(() => {
-    const mockUsers = [
-      {
-        id: 1,
-        name: 'Prof. João Silva',
-        email: 'joao.silva@uevora.pt',
-        profiles: ['administrador'],
-        department: 'Engenharia Informática',
-        buildingAccess: ['all']
-      },
-      {
-        id: 2,
-        name: 'Prof. Maria Santos',
-        email: 'maria.santos@uevora.pt',
-        profiles: ['secretariado'],
-        department: 'Secretariado Académico',
-        buildingAccess: [1, 2, 3]
-      },
-      {
-        id: 3,
-        name: 'Ana Costa',
-        email: 'ana.costa@uevora.pt',
-        profiles: ['docente'],
-        department: 'Matemática',
-        buildingAccess: []
-      },
-      {
-        id: 4,
-        name: 'Carlos Ferreira',
-        email: 'carlos.ferreira@uevora.pt',
-        profiles: ['aluno'],
-        department: 'Engenharia Informática',
-        buildingAccess: []
-      },
-      {
-        id: 5,
-        name: 'Dra. Teresa Rodrigues',
-        email: 'teresa.rodrigues@uevora.pt',
-        profiles: ['secretariado', 'docente'],
-        department: 'Secretariado de Ciências',
-        buildingAccess: [1, 2]
-      },
-      {
-        id: 6,
-        name: 'Prof. António Mendes',
-        email: 'antonio.mendes@uevora.pt',
-        profiles: ['docente', 'secretariado'],
-        department: 'Física',
-        buildingAccess: [3, 4]
-      },
-      {
-        id: 7,
-        name: 'Super Admin',
-        email: 'admin@uevora.pt',
-        profiles: ['administrador', 'secretariado', 'docente'],
-        department: 'Administração',
-        buildingAccess: ['all']
+    const fetchUsers = async () => {
+      try {
+        const data = await api.getUsers();
+        setUsers(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Erro ao carregar utilizadores:', error);
       }
-    ];
-    setUsers(mockUsers);
-    setFilteredUsers(mockUsers);
+    };
+    fetchUsers();
   }, []);
 
-  // Filter users based on search
-  useEffect(() => {
-    const filtered = users.filter(user =>
+  // Lista filtrada pela pesquisa (derivada de users + searchTerm)
+  const filteredUsers = useMemo(
+    () => users.filter(user =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredUsers(filtered);
-  }, [searchTerm, users]);
+    ),
+    [users, searchTerm]
+  );
 
-  const buildings = [
-    { id: 1, name: 'Colégio do Espírito Santo' },
-    { id: 2, name: 'Colégio Mateus de Aranda' },
-    { id: 3, name: 'Pólo da Mitra' },
-    { id: 4, name: 'Complexo Desportivo' }
-  ];
-
-  // Obter o level máximo do utilizador para determinar o perfil principal
-  const getMaxProfileLevel = (profiles) => {
-    let maxLevel = 0;
-    profiles.forEach(profileId => {
-      const profile = profileTypes.find(p => p.id === profileId);
-      if (profile && profile.level > maxLevel) {
-        maxLevel = profile.level;
+  // Carregar edifícios (para os checkboxes de acesso do secretariado)
+  useEffect(() => {
+    const fetchBuildings = async () => {
+      try {
+        const data = await api.getBuildings();
+        setBuildings(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Erro ao carregar edifícios:', error);
       }
-    });
-    return maxLevel;
-  };
-
-  const getPrimaryRole = (profiles) => {
-    const maxLevel = getMaxProfileLevel(profiles);
-    const primaryProfile = profileTypes.find(p => p.level === maxLevel);
-    return primaryProfile ? primaryProfile.id : 'aluno';
-  };
-
-  const getRoleIcon = (profiles) => {
-    const primaryRole = getPrimaryRole(profiles);
-    const profile = profileTypes.find(p => p.id === primaryRole);
-    return profile ? profile.icon : '👤';
-  };
-
-  const getRoleLabel = (profiles) => {
-    const labels = [];
-    profiles.forEach(profileId => {
-      const profile = profileTypes.find(p => p.id === profileId);
-      if (profile) labels.push(profile.label);
-    });
-    return labels.join(', ');
-  };
+    };
+    fetchBuildings();
+  }, []);
 
   const startEditing = (user) => {
     setEditingId(user.id);
@@ -159,24 +89,29 @@ const ManageUsers = () => {
     });
   };
 
-  const saveEditing = () => {
+  const saveEditing = async () => {
     // Prevent admin from removing their own admin profile
     if (editingId === currentAdminId && !editingPermissions.profiles.includes('administrador')) {
       alert('Não pode remover as suas próprias permissões de administrador.');
       return;
     }
 
-    setUsers(prev => prev.map(user =>
-      user.id === editingId
-        ? {
-            ...user,
-            profiles: [...editingPermissions.profiles],
-            buildingAccess: [...editingPermissions.buildingAccess]
-          }
-        : user
-    ));
-    setEditingId(null);
-    alert('Permissões atualizadas com sucesso!');
+    try {
+      const updated = await api.updateUser(editingId, {
+        profiles: [...editingPermissions.profiles],
+        buildingAccess: [...editingPermissions.buildingAccess]
+      });
+      if (updated?.id) {
+        setUsers(prev => prev.map(user => (user.id === editingId ? { ...user, ...updated } : user)));
+        setEditingId(null);
+        alert('Permissões atualizadas com sucesso!');
+      } else {
+        alert('Não foi possível atualizar as permissões.');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar utilizador:', error);
+      alert('Erro ao atualizar utilizador.');
+    }
   };
 
   const cancelEditing = () => {
@@ -218,11 +153,21 @@ const ManageUsers = () => {
   };
 
   // Confirmar eliminação
-  const confirmDelete = () => {
-    setUsers(prev => prev.filter(user => user.id !== userToDelete.id));
-    setShowDeleteModal(false);
-    setUserToDelete(null);
-    alert('Utilizador eliminado com sucesso!');
+  const confirmDelete = async () => {
+    try {
+      const ok = await api.deleteUser(userToDelete.id);
+      if (ok) {
+        setUsers(prev => prev.filter(user => user.id !== userToDelete.id));
+        setShowDeleteModal(false);
+        setUserToDelete(null);
+        alert('Utilizador eliminado com sucesso!');
+      } else {
+        alert('Não foi possível eliminar o utilizador.');
+      }
+    } catch (error) {
+      console.error('Erro ao eliminar utilizador:', error);
+      alert('Erro ao eliminar utilizador.');
+    }
   };
 
   // Cancelar eliminação

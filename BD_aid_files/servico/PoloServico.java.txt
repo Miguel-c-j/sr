@@ -1,0 +1,38 @@
+package com.example.application.BD.servico;
+
+import com.example.application.BD.entidades.Polo;
+import com.example.application.BD.repositorios.PoloRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class PoloServico {
+
+    private final PoloRepository poloRepository;
+
+    public PoloServico(PoloRepository poloRepository) {
+        this.poloRepository = poloRepository;
+    }
+
+    public List<Polo> findAll() {
+        return poloRepository.findAll();
+    }
+
+    public Optional<Polo> findById(Long id) {
+        return poloRepository.findById(id);
+    }
+
+    public Optional<Polo> findByNome(String nome) {
+        return poloRepository.findByNome(nome);
+    }
+
+    public Polo save(Polo polo) {
+        return poloRepository.save(polo);
+    }
+
+    public void delete(Long id) {
+        poloRepository.deleteById(id);
+    }
+}

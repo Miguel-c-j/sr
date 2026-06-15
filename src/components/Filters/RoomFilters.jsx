@@ -1,6 +1,27 @@
 // src/components/Filters/RoomFilters.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FaSearch, FaTrash, FaBookmark, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+
+// Salas por edifício (dados estáticos dos filtros) — fora do componente para ser estável.
+const roomsByBuilding = {
+  "Colégio do Espírito Santo": [
+    { id: 1, name: "Sala 101" },
+    { id: 2, name: "Sala 102" },
+    { id: 3, name: "Laboratório 202" }
+  ],
+  "Colégio Mateus de Aranda": [
+    { id: 4, name: "Sala de Reuniões 305" },
+    { id: 5, name: "Sala 201" }
+  ],
+  "Pólo da Mitra": [
+    { id: 6, name: "Sala 001" },
+    { id: 7, name: "Sala 002" }
+  ],
+  "Complexo Desportivo": [
+    { id: 8, name: "Auditório" },
+    { id: 9, name: "Sala de Dança" }
+  ]
+};
 
 const RoomFilters = ({ onSearch, onClear, filters, setFilters, requiredFiltersFilled, preFillFilters = null }) => {
   // Estados para os accordions
@@ -14,9 +35,6 @@ const RoomFilters = ({ onSearch, onClear, filters, setFilters, requiredFiltersFi
     equipamentos: false
   });
 
-  const [availableRooms, setAvailableRooms] = useState([]);
-  const [selectedBuildingName, setSelectedBuildingName] = useState('');
-
   // Mock data for filters
   const buildings = [
     { id: 1, name: "Colégio do Espírito Santo" },
@@ -24,27 +42,6 @@ const RoomFilters = ({ onSearch, onClear, filters, setFilters, requiredFiltersFi
     { id: 3, name: "Pólo da Mitra" },
     { id: 4, name: "Complexo Desportivo" }
   ];
-
-  // Rooms by building
-  const roomsByBuilding = {
-    "Colégio do Espírito Santo": [
-      { id: 1, name: "Sala 101" },
-      { id: 2, name: "Sala 102" },
-      { id: 3, name: "Laboratório 202" }
-    ],
-    "Colégio Mateus de Aranda": [
-      { id: 4, name: "Sala de Reuniões 305" },
-      { id: 5, name: "Sala 201" }
-    ],
-    "Pólo da Mitra": [
-      { id: 6, name: "Sala 001" },
-      { id: 7, name: "Sala 002" }
-    ],
-    "Complexo Desportivo": [
-      { id: 8, name: "Auditório" },
-      { id: 9, name: "Sala de Dança" }
-    ]
-  };
 
   const roomTypes = [
     { id: "aula", label: "Aula" },
@@ -75,27 +72,19 @@ const RoomFilters = ({ onSearch, onClear, filters, setFilters, requiredFiltersFi
 
   const timeSlots = generateTimeSlots();
 
-  // Efeito para pré-preenchimento
+  // Pré-preenchimento: quando chega a prop preFillFilters, sincroniza os filtros do
+  // componente-pai. É um efeito de sincronização legítimo (prop externa -> estado).
   useEffect(() => {
     if (preFillFilters) {
-      const newFilters = { ...filters, ...preFillFilters };
-      setFilters(newFilters);
-      if (newFilters.building) {
-        setSelectedBuildingName(newFilters.building);
-      }
+      setFilters(prev => ({ ...prev, ...preFillFilters }));
     }
-  }, [preFillFilters]);
+  }, [preFillFilters, setFilters]);
 
-  // Update available rooms when building changes
-  useEffect(() => {
-    if (filters.building) {
-      setAvailableRooms(roomsByBuilding[filters.building] || []);
-      setSelectedBuildingName(filters.building);
-    } else {
-      setAvailableRooms([]);
-      setSelectedBuildingName('');
-    }
-  }, [filters.building]);
+  // Salas disponíveis para o edifício selecionado (derivado de filters.building)
+  const availableRooms = useMemo(
+    () => (filters.building ? roomsByBuilding[filters.building] || [] : []),
+    [filters.building]
+  );
 
   const toggleSection = (section) => {
     setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));

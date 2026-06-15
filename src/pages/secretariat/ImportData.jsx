@@ -8,6 +8,7 @@ import {
   FaExclamationTriangle,
   FaSpinner
 } from 'react-icons/fa';
+import api from '../../services/api';
 import '../../styles/secretariat.css';
 
 const ImportData = () => {
@@ -69,27 +70,19 @@ const ImportData = () => {
     setIsUploading(true);
     setImportResult(null);
 
-    // Simular processo de importação
-    setTimeout(() => {
-      const mockResult = {
-        success: true,
-        totalRecords: 245,
-        successCount: 238,
-        errorCount: 7,
-        errors: [
-          { row: 15, message: 'Formato de data inválido' },
-          { row: 42, message: 'Sala não encontrada' },
-          { row: 78, message: 'Horário sobreposto' },
-          { row: 103, message: 'Capacidade excedida' },
-          { row: 156, message: 'Formato de hora inválido' },
-          { row: 189, message: 'Edifício não encontrado' },
-          { row: 201, message: 'Professor não encontrado' }
-        ]
-      };
-
-      setImportResult(mockResult);
+    try {
+      const result = await api.importData(importType, file);
+      if (result?.detail) {
+        alert(result.detail);
+      } else {
+        setImportResult(result);
+      }
+    } catch (error) {
+      console.error('Erro na importação:', error);
+      alert('Erro ao importar o ficheiro. Verifique o formato e tente novamente.');
+    } finally {
       setIsUploading(false);
-    }, 3000);
+    }
   };
 
   const handleClear = () => {
@@ -98,9 +91,8 @@ const ImportData = () => {
     setImportResult(null);
   };
 
-  const downloadTemplate = (type) => {
-    // Mock download - será implementado com arquivos reais
-    alert(`Download do template para ${type} iniciado...`);
+  const downloadTemplate = (typeId) => {
+    window.open(api.templateUrl(typeId), '_blank');
   };
 
   return (
@@ -270,7 +262,7 @@ const ImportData = () => {
                 </div>
                 <button
                   className="btn-download"
-                  onClick={() => downloadTemplate(type.label)}
+                  onClick={() => downloadTemplate(type.id)}
                 >
                   <FaDownload /> Template
                 </button>

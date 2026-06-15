@@ -12,6 +12,7 @@ import {
   FaCheckDouble,
   FaExclamationTriangle
 } from 'react-icons/fa';
+import api from '../../services/api';
 import '../../styles/secretariat.css';
 
 const PendingRequests = () => {
@@ -30,120 +31,21 @@ const PendingRequests = () => {
     dateRange: 'todas'
   });
 
-  // Mock data
-  useEffect(() => {
-    setTimeout(() => {
-      const mockRequests = [
-        {
-          id: 1,
-          solicitante: {
-            nome: "Prof. Ana Silva",
-            email: "ana.silva@uevora.pt",
-            tipo: "docente"
-          },
-          sala: {
-            nome: "Sala 101",
-            edificio: "Colégio do Espírito Santo",
-            capacidade: 30
-          },
-          data: "2026-04-25",
-          horaInicio: "09:00",
-          horaFim: "11:00",
-          duracao: "2 horas",
-          proposito: "Aula de Programação Web",
-          dataSubmissao: "2026-04-10T09:30:00",
-          status: "pending",
-          prioridade: "normal"
-        },
-        {
-          id: 2,
-          solicitante: {
-            nome: "Dr. Carlos Santos",
-            email: "carlos.santos@uevora.pt",
-            tipo: "docente"
-          },
-          sala: {
-            nome: "Laboratório 202",
-            edificio: "Colégio do Espírito Santo",
-            capacidade: 20
-          },
-          data: "2026-04-26",
-          horaInicio: "14:00",
-          horaFim: "17:00",
-          duracao: "3 horas",
-          proposito: "Experiências de Química",
-          dataSubmissao: "2026-04-11T14:15:00",
-          status: "pending",
-          prioridade: "alta"
-        },
-        {
-          id: 3,
-          solicitante: {
-            nome: "Maria Oliveira",
-            email: "maria.oliveira@alunos.uevora.pt",
-            tipo: "estudante"
-          },
-          sala: {
-            nome: "Sala de Reuniões 305",
-            edificio: "Colégio Mateus de Aranda",
-            capacidade: 15
-          },
-          data: "2026-04-27",
-          horaInicio: "10:00",
-          horaFim: "12:00",
-          duracao: "2 horas",
-          proposito: "Reunião de Grupo - Projeto Final",
-          dataSubmissao: "2026-04-12T11:00:00",
-          status: "pending",
-          prioridade: "normal"
-        },
-        {
-          id: 4,
-          solicitante: {
-            nome: "Prof. João Mendes",
-            email: "joao.mendes@uevora.pt",
-            tipo: "docente"
-          },
-          sala: {
-            nome: "Auditório",
-            edificio: "Complexo Desportivo",
-            capacidade: 150
-          },
-          data: "2026-05-02",
-          horaInicio: "09:00",
-          horaFim: "13:00",
-          duracao: "4 horas",
-          proposito: "Palestra sobre Inovação",
-          dataSubmissao: "2026-04-13T08:45:00",
-          status: "pending",
-          prioridade: "alta"
-        },
-        {
-          id: 5,
-          solicitante: {
-            nome: "Teresa Costa",
-            email: "teresa.costa@alunos.uevora.pt",
-            tipo: "estudante"
-          },
-          sala: {
-            nome: "Sala 204",
-            edificio: "Colégio Mateus de Aranda",
-            capacidade: 25
-          },
-          data: "2026-04-28",
-          horaInicio: "15:00",
-          horaFim: "17:00",
-          duracao: "2 horas",
-          proposito: "Estudo em Grupo",
-          dataSubmissao: "2026-04-13T16:30:00",
-          status: "pending",
-          prioridade: "normal"
-        }
-      ];
-
-      setRequests(mockRequests);
+  // Carregar pedidos pendentes
+  const fetchPending = async () => {
+    try {
+      const data = await api.getPendingReservations();
+      setRequests(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Erro ao carregar pedidos pendentes:', error);
+      setRequests([]);
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
+  };
+
+  useEffect(() => {
+    fetchPending();
   }, []);
 
   // Aplicar filtros
@@ -174,7 +76,11 @@ const PendingRequests = () => {
   const handleApprove = async (requestId) => {
     if (window.confirm('Tem certeza que deseja aprovar esta reserva?')) {
       try {
-        // TODO: Chamar API para aprovar
+        const result = await api.approveReservation(requestId);
+        if (result?.detail) {
+          alert(result.detail);
+          return;
+        }
         setRequests(prev => prev.filter(req => req.id !== requestId));
         alert('Reserva aprovada com sucesso!');
       } catch (error) {
@@ -184,16 +90,25 @@ const PendingRequests = () => {
     }
   };
 
-  const handleBulkApprove = () => {
+  const handleBulkApprove = async () => {
     if (selectedRequests.length === 0) {
       alert('Selecione pelo menos uma reserva para aprovar');
       return;
     }
 
     if (window.confirm(`Aprovar ${selectedRequests.length} reserva(s)?`)) {
-      setRequests(prev => prev.filter(req => !selectedRequests.includes(req.id)));
-      setSelectedRequests([]);
-      alert(`${selectedRequests.length} reserva(s) aprovada(s) com sucesso!`);
+      try {
+        const results = await Promise.all(
+          selectedRequests.map(id => api.approveReservation(id))
+        );
+        const approvedIds = selectedRequests.filter((id, idx) => !results[idx]?.detail);
+        setRequests(prev => prev.filter(req => !approvedIds.includes(req.id)));
+        setSelectedRequests([]);
+        alert(`${approvedIds.length} reserva(s) aprovada(s) com sucesso!`);
+      } catch (error) {
+        console.error('Erro ao aprovar em lote:', error);
+        alert('Erro ao aprovar reservas. Tente novamente.');
+      }
     }
   };
 
@@ -209,7 +124,7 @@ const PendingRequests = () => {
     }
 
     try {
-      // TODO: Chamar API para rejeitar com motivo
+      await api.rejectReservation(currentRejectRequest.id, rejectionReason);
       setRequests(prev => prev.filter(req => req.id !== currentRejectRequest.id));
       setShowRejectModal(false);
       setRejectionReason('');

@@ -1,0 +1,62 @@
+package com.example.application.BD.entidades;
+
+import jakarta.persistence.*;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+@Entity
+@Table(name = "perfil")
+public class Perfil {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String nome;
+
+    @ManyToMany(mappedBy = "perfis")
+    private Set<Utilizador> utilizadores = new HashSet<>();
+
+    public Perfil() {}
+
+    public Perfil(String nome) {
+        this.nome = nome;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getNome() {
+        return nome;
+    }
+
+    public void setNome(String nome) {
+        this.nome = nome;
+    }
+
+    public Set<Utilizador> getUtilizadores() {
+        return utilizadores;
+    }
+
+    public void setUtilizadores(Set<Utilizador> utilizadores) {
+        this.utilizadores = utilizadores;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Perfil perfil = (Perfil) o;
+        return id != null && id.equals(perfil.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id != null ? id.hashCode() : 0;
+    }
+
+}
