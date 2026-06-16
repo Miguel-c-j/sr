@@ -91,7 +91,16 @@ npm install && npm run dev
 
 ## Entrar na aplicação
 
-Login só com **email institucional** (sem password). Contas de demonstração:
+O acesso é **só por login com Google**, usando o email institucional
+(`@uevora.pt` ou `@alunos.uevora.pt`). **É preciso configurar o Google primeiro**
+(ver secção abaixo) — sem isso o ecrã de login mostra apenas um aviso e ninguém entra.
+
+Entras com a **tua** conta institucional Google. Na primeira vez a conta é criada com
+o perfil do domínio (`@alunos` → aluno, `@uevora` → docente). Para outros perfis
+(secretariado/admin), um administrador atribui-os em **Gerir Utilizadores**. Se a
+conta tiver 2+ perfis, aparece a página de seleção de perfil depois do login.
+
+Estes utilizadores de demonstração ficam criados pelo `seed_demo`:
 
 | Email | Perfil |
 |-------|--------|
@@ -101,8 +110,24 @@ Login só com **email institucional** (sem password). Contas de demonstração:
 | `aluno@alunos.uevora.pt` | Aluno |
 | `coordenacao@uevora.pt` | Vários perfis → mostra a página de seleção de perfil |
 
-> **Login com Google** é opcional e está desativado por defeito (o botão fica escondido).
-> Para o ativar é preciso um Client ID da Google Cloud — ver secção 11.1 do `DOCUMENTACAO.md`.
+> Só consegues entrar como uma destas contas se tiveres acesso a esse email Google.
+> Para testar a API sem Google, há o endpoint legado `/api/users/login/` (ver `DOCUMENTACAO.md`).
+
+## Configurar o login com Google (obrigatório)
+
+1. **[Google Cloud Console](https://console.cloud.google.com/)** → cria um projeto
+   (conta pessoal: Organização = "Sem organização", recurso pai vazio).
+2. **APIs & Services → OAuth consent screen** → tipo **External**. Em modo *Testing*,
+   adiciona as contas que vão entrar em **Test users**.
+3. **APIs & Services → Credentials** → *Create credentials* → **OAuth client ID** →
+   **Web application**. Em **Authorized JavaScript origins** adiciona
+   `http://localhost:5173` e `http://127.0.0.1:5173`.
+4. Copia o **Client ID** (`xxxx.apps.googleusercontent.com`) e mete-o nos **dois** sítios:
+   - **`.env`** na raiz do projeto: `VITE_GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com`
+   - **`backend/.env`**: `GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com`
+5. Reinicia o `npm run dev` e o `python manage.py runserver`.
+
+> Detalhes completos: secção 11.1 do `DOCUMENTACAO.md`.
 
 ---
 
@@ -117,3 +142,5 @@ Login só com **email institucional** (sem password). Contas de demonstração:
 | `npm: command not found` | Node não instalado / não no PATH (reabre o terminal após instalar). |
 | Página de salas não mostra nada | Faltam os filtros obrigatórios: **Data, Edifício e Capacidade Mínima**. |
 | `404` em `http://localhost:8000/` | Normal — a API está em `/api/`. A app é o frontend (5173). |
+| Login mostra "Login Google não configurado" | Falta `VITE_GOOGLE_CLIENT_ID` (`.env` da raiz) e/ou `GOOGLE_CLIENT_ID` (`backend/.env`) — ver secção do Google acima. |
+| Google diz "Use uma conta institucional" | A conta não é `@uevora.pt`/`@alunos.uevora.pt`, ou (modo *Testing*) não está nos *Test users* do projeto Google. |

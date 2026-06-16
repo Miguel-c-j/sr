@@ -37,8 +37,21 @@ A API fica em `http://localhost:8000/api/` (a mesma `API_BASE_URL` do frontend).
 
 ## Autenticação
 
-Login **simplificado por email** (sem password), aceitando apenas `@uevora.pt`
-e `@alunos.uevora.pt`:
+A app entra **só por login com Google** (email institucional). O backend verifica o
+ID token do Google, valida o domínio (`@uevora.pt` / `@alunos.uevora.pt`) e devolve
+tokens JWT:
+
+```
+POST /api/users/google-login/
+{ "credential": "<google-id-token>" }
+-> { "access": "...", "refresh": "...", "user": { ... } }
+```
+
+Requer `GOOGLE_CLIENT_ID` em `backend/.env` (e `VITE_GOOGLE_CLIENT_ID` no frontend).
+Ver secção 11.1 do `DOCUMENTACAO.md` para a configuração no Google Cloud.
+
+Existe ainda um endpoint **legado** por email (sem password), **não usado pela UI** —
+útil para testar a API sem configurar o Google:
 
 ```
 POST /api/users/login/
@@ -46,11 +59,11 @@ POST /api/users/login/
 -> { "access": "...", "refresh": "...", "user": { ... } }
 ```
 
-Se o email for válido mas o utilizador não existir, é criado automaticamente
+Em ambos, se o email for válido mas o utilizador não existir, é criado automaticamente
 com o perfil correspondente ao domínio (`@alunos` -> aluno, `@uevora` -> docente).
 Os pedidos autenticados usam `Authorization: Bearer <access>`.
 
-Emails de demonstração (criados pelo `seed_demo`):
+Utilizadores de demonstração (criados pelo `seed_demo`):
 
 | Email | Perfil |
 |-------|--------|
@@ -59,11 +72,15 @@ Emails de demonstração (criados pelo `seed_demo`):
 | `professor@uevora.pt` | docente |
 | `aluno@alunos.uevora.pt` | aluno |
 
+> Pela UI só entras como uma destas contas se tiveres acesso ao respetivo email Google;
+> caso contrário usa o endpoint legado `/api/users/login/` acima para testes.
+
 ## Endpoints
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| POST | `/api/users/login/` | Login por email |
+| POST | `/api/users/google-login/` | Login com Google (ID token) — **único login da app** |
+| POST | `/api/users/login/` | Login por email — legado, só dev (não usado pela UI) |
 | GET/PATCH/DELETE | `/api/users/` | Gestão de utilizadores (perfis, acessos) |
 | GET/POST/PUT/DELETE | `/api/buildings/` | Edifícios (`roomCount`) |
 | GET/POST/PUT/DELETE | `/api/equipment/` | Equipamentos (`code`, `usageCount`) |
@@ -118,8 +135,7 @@ Resposta no formato esperado pelo frontend:
 ## Notas
 
 - Os perfis de acesso são determinados pelos `profiles` do utilizador no servidor.
-  O dropdown de perfil do `LoginPage.jsx` é apenas visual — ao ligar ao backend,
-  usa `data.user.profiles` da resposta do login.
-- As páginas do frontend ainda usam dados mock; os métodos em `src/services/api.js`
-  (incluindo `getPendingReservations`, `getReservationHistory`, `importData`) já
-  apontam para estes endpoints e devolvem os formatos corretos para os ligar.
+  Após o login (Google), o `LoginPage.jsx` usa `data.user.profiles`: com 2+ perfis
+  mostra a página de seleção de perfil, senão entra direto.
+- As páginas do frontend estão ligadas ao backend via `src/services/api.js` (sem
+  mocks), incluindo `getPendingReservations`, `getReservationHistory` e `importData`.

@@ -92,7 +92,7 @@ sr/
 │   │   └── auth.js            # Lógica de perfis/sessão (perfil ativo, página inicial)
 │   │
 │   ├── pages/                 # Uma página por ecrã
-│   │   ├── LoginPage.jsx               # Login por email + Google (sem dropdown)
+│   │   ├── LoginPage.jsx               # Login com Google (única forma de acesso)
 │   │   ├── ProfileSelect.jsx           # Escolher perfil (quando há 2+)
 │   │   ├── RoomsPage.jsx               # Pesquisar e reservar salas
 │   │   ├── ReservationsPage.jsx        # "Minhas Reservas"
@@ -217,15 +217,22 @@ A lógica de **perfis/sessão** está separada em `src/services/auth.js`:
 
 ### 5.3 Autenticação (passo a passo)
 
-Há **dois modos de login** (sem dropdown de perfil):
+A **única forma de aceder ao sistema** é o **login com Google** usando o email
+institucional (`@uevora.pt` / `@alunos.uevora.pt`):
 
-- **Email institucional** (sem password) → `api.login(email)` → `POST /api/users/login/`.
-- **Google** (se configurado) → `api.loginWithGoogle(idToken)` → `POST /api/users/google-login/`.
+- **Google** → `api.loginWithGoogle(idToken)` → `POST /api/users/google-login/`.
+- Se a autenticação falhar, o utilizador **fica na página de login** e vê uma
+  mensagem de erro (domínio inválido, token recusado, etc.).
+
+> O endpoint legado `POST /api/users/login/` (login por email sem password) ainda
+> existe no backend para testes/desenvolvimento, mas **não está exposto na UI** — o
+> ecrã de login só mostra o botão Google.
 
 Fluxo comum após autenticar:
 
-1. O backend valida o domínio (`@uevora.pt` / `@alunos.uevora.pt`) e devolve
-   `{ access, refresh, user }`. O `api.js` guarda tudo no `localStorage`.
+1. O backend verifica o token do Google, valida o domínio (`@uevora.pt` /
+   `@alunos.uevora.pt`) e devolve `{ access, refresh, user }`. O `api.js` guarda tudo
+   no `localStorage`.
 2. O `LoginPage` olha para `user.profiles`:
    - **1 perfil** → `applyRole` define o perfil ativo e navega para a página inicial.
    - **2+ perfis** → navega para **`/selecionar-perfil`**, onde o utilizador escolhe;
@@ -275,9 +282,12 @@ O backend está organizado em **4 apps**, cada uma com uma responsabilidade clar
   - `name`, `department`;
   - `profiles` — lista de perfis (ArrayField), ex.: `['docente','secretariado']`;
   - `building_access` — edifícios a que o secretariado acede (`['all']` ou lista de ids).
-- **`LoginView`** — login simplificado por email (sem password): valida o domínio e,
-  se o utilizador não existir, **cria-o automaticamente** com o perfil correspondente
-  ao domínio (`@alunos` → aluno, `@uevora` → docente). Devolve tokens JWT + user.
+- **`GoogleLoginView`** — login com Google (única forma de acesso pela UI): verifica
+  o ID token do Google, valida o domínio e, se o utilizador não existir, **cria-o
+  automaticamente** com o perfil correspondente ao domínio (`@alunos` → aluno,
+  `@uevora` → docente). Devolve tokens JWT + user.
+- **`LoginView`** — login legado por email (sem password); mesma lógica de criação de
+  utilizador, mas **não é usado pela UI** (mantido só para testes/desenvolvimento).
 - **`UserViewSet`** — listar, editar (perfis/acessos) e eliminar utilizadores.
 
 ### 6.2 `facilities` — edifícios, equipamentos e salas
@@ -432,8 +442,8 @@ Base: `http://localhost:8000/api`
 
 | Método | Rota | Descrição | Quem |
 |--------|------|-----------|------|
-| POST | `/users/login/` | Login por email → tokens JWT | público |
-| POST | `/users/google-login/` | Login com Google (ID token) → tokens JWT | público |
+| POST | `/users/google-login/` | Login com Google (ID token) → tokens JWT — **único login da app** | público |
+| POST | `/users/login/` | Login por email → tokens JWT — legado, só dev (não usado pela UI) | público |
 | GET/PATCH/DELETE | `/users/` | Gestão de utilizadores | admin |
 | GET/POST/PUT/DELETE | `/buildings/` | Edifícios (com `roomCount`) | autenticado |
 | GET/POST/PUT/DELETE | `/equipment/` | Equipamentos (com `usageCount`) | autenticado |
@@ -449,9 +459,12 @@ Base: `http://localhost:8000/api`
 | POST | `/imports/` | Importar CSV | secretariado |
 | GET | `/imports/template/?type=` | Descarregar modelo CSV | público |
 
-Login (exemplo):
+Login na app: feito **com Google** (`/users/google-login/`, recebe o ID token do
+Google Identity Services). O endpoint por email abaixo é **só para testes** — a UI
+não o usa:
 
 ```bash
+# endpoint legado (dev) — útil para testar a API sem configurar o Google
 curl -X POST http://localhost:8000/api/users/login/ \
   -H 'Content-Type: application/json' \
   -d '{"email":"secretariado@uevora.pt"}'
@@ -526,7 +539,8 @@ npm install
 npm run dev      # http://localhost:5173
 ```
 
-Abre **http://localhost:5173** e entra com um dos emails de demonstração.
+Abre **http://localhost:5173** e entra com o botão **Google** (email institucional).
+Requer o login Google configurado — ver **secção 11.1** (sem isso não é possível entrar).
 
 ### Comandos úteis
 
@@ -541,36 +555,46 @@ docker compose down                # parar a base de dados
 
 ---
 
-## 11.1 Configurar login com Google (opcional)
+## 11.1 Configurar login com Google (obrigatório)
 
-O sistema suporta dois modos de login: **email institucional** (sempre ativo) e
-**Google** (ativa-se quando configurado). O perfil é determinado pela conta no
-servidor; se o utilizador tiver **2 ou mais perfis**, é mostrada uma **página de
-seleção de perfil** após o login.
+O login com Google é a **única forma de entrar na aplicação** — sem ele o ecrã de
+login apenas mostra um aviso "Login Google não configurado" e ninguém consegue
+autenticar-se. Por isso esta configuração é **obrigatória**. O perfil é determinado
+pela conta no servidor; se o utilizador tiver **2 ou mais perfis**, é mostrada uma
+**página de seleção de perfil** após o login.
 
 Para ativar o botão "Entrar com Google":
 
-1. Em [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services →
-   Credentials** → *Create credentials* → **OAuth client ID** → tipo **Web application**.
-2. Em **Authorized JavaScript origins** adiciona `http://localhost:5173`.
-3. Copia o **Client ID** gerado (algo como `xxxx.apps.googleusercontent.com`).
-4. **Frontend** — cria `.env.local` na raiz do projeto:
+1. **Criar projeto** — em [Google Cloud Console](https://console.cloud.google.com/),
+   no seletor de projetos → **New Project**. Com conta pessoal, deixa **Organização:
+   "Sem organização"** e o **recurso pai** vazio.
+2. **OAuth consent screen** → **APIs & Services → OAuth consent screen** → tipo
+   **External**. Em modo *Testing*, adiciona em **Test users** as contas Google
+   (`@uevora.pt` / `@alunos.uevora.pt`) que vão poder entrar.
+3. **Credenciais** → **APIs & Services → Credentials** → *Create credentials* →
+   **OAuth client ID** → tipo **Web application**.
+4. Em **Authorized JavaScript origins** adiciona `http://localhost:5173` e
+   `http://127.0.0.1:5173`. (Os *redirect URIs* podem ficar vazios.)
+5. Copia o **Client ID** gerado (algo como `xxxx.apps.googleusercontent.com`).
+6. **Frontend** — em `.env` na raiz do projeto (copia de `.env.example`):
    ```dotenv
    VITE_GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
    ```
-5. **Backend** — em `backend/.env` define o **mesmo** id:
+7. **Backend** — em `backend/.env` define o **mesmo** id:
    ```dotenv
    GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
    ```
-6. Reinicia o `npm run dev` e o `runserver`.
+8. Reinicia o `npm run dev` e o `runserver` (o Vite só lê o `.env` no arranque).
 
 Notas:
-- Sem estas variáveis, o botão Google fica escondido e o login por email continua a
-  funcionar normalmente.
+- **Sem estas variáveis ninguém consegue entrar** — o botão Google não aparece e não
+  há login por email na UI.
 - O backend **verifica** o token do Google e só aceita emails `@uevora.pt` /
-  `@alunos.uevora.pt` (contas Google fora destes domínios são recusadas).
-- O Client ID OAuth não é segredo (fica exposto no browser), mas é por-deployment —
-  por isso vive no `.env.local` (ignorado pelo git).
+  `@alunos.uevora.pt` (contas Google fora destes domínios são recusadas com mensagem
+  de erro, ficando na página de login).
+- O Client ID OAuth não é segredo (fica exposto no browser), mas é por-deployment.
+- Em produção, adiciona o domínio real aos *Authorized JavaScript origins* e publica
+  o *OAuth consent screen*.
 
 ---
 
@@ -582,7 +606,7 @@ e, no fim, chama o `seed_clav` que importa as **34 salas reais do Colégio Luís
 Verney** (ficheiro `SALAS CLAV.xlsx`). Total: **5 edifícios, 41 salas**. É idempotente
 (pode correr várias vezes sem duplicar).
 
-Login (a password é ignorada — basta o email):
+Estes utilizadores ficam criados na base de dados com os perfis indicados:
 
 | Email | Perfil | Entra em |
 |-------|--------|----------|
@@ -591,6 +615,13 @@ Login (a password é ignorada — basta o email):
 | `professor@uevora.pt` | docente | salas |
 | `aluno@alunos.uevora.pt` | aluno | salas |
 | `coordenacao@uevora.pt` | secretariado + docente | **mostra a página de seleção de perfil** |
+
+> **Como entrar:** a app só aceita **login com Google**, por isso só consegues entrar
+> como uma destas contas se tiveres mesmo acesso a esse email Google. Na prática
+> entras com a **tua** conta institucional — na primeira vez é criada com o perfil do
+> domínio (`@alunos` → aluno, `@uevora` → docente) e um administrador atribui-lhe
+> outros perfis em **Gerir Utilizadores**. Para testar a API sem Google, usa o
+> endpoint legado `/users/login/` (secção 9) com qualquer destes emails.
 
 > Para entrar no admin do Django (`/admin/`) é preciso uma password — usa
 > `python manage.py createsuperuser` ou define uma para o `admin@uevora.pt`.
@@ -604,6 +635,8 @@ Login (a password é ignorada — basta o email):
 | `404` em `http://localhost:8000/` | Normal — a API está em `/api/`, não na raiz. |
 | `That port is already in use` (8000) | Já há um servidor a correr nessa porta; fecha-o ou usa outra porta. |
 | Login falha com "Erro de ligação ao servidor" | O backend não está a correr ou o Postgres está em baixo (`docker compose up -d`). |
+| Ecrã de login mostra "Login Google não configurado" | Falta `VITE_GOOGLE_CLIENT_ID` (frontend) e/ou `GOOGLE_CLIENT_ID` (backend) — ver secção 11.1. |
+| Google recusa a conta / "Use uma conta institucional" | A conta Google não é `@uevora.pt` / `@alunos.uevora.pt`, ou (em modo *Testing*) não está nos *Test users* do projeto Google. |
 | `npm: command not found` | Node não instalado / não no PATH (usa nvm e reabre o terminal). |
 | Pesquisa de salas não mostra nada | Faltam os filtros obrigatórios: **Data, Edifício e Capacidade Mínima**. |
 | Erro de CORS no browser | Confirma que o backend corre em `DEBUG=True` (CORS aberto) e na porta 8000. |
@@ -615,7 +648,8 @@ Login (a password é ignorada — basta o email):
 
 - O frontend não guarda lógica de negócio: as regras (conflitos, permissões, validações)
   estão **no backend**, que é a fonte de verdade.
-- O perfil de acesso é determinado pelos `profiles` reais do utilizador no servidor; o
-  dropdown do login serve apenas para escolher com qual perfil entrar.
+- O perfil de acesso é determinado pelos `profiles` reais do utilizador no servidor; a
+  página de seleção de perfil (mostrada só quando há 2+ perfis) serve apenas para
+  escolher com qual perfil entrar.
 - Para detalhes específicos do backend, ver também `backend/README.md`.
 ```

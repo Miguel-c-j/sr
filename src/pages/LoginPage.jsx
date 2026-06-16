@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
-import { FaEnvelope, FaSignInAlt, FaUniversity } from 'react-icons/fa';
+import { FaUniversity } from 'react-icons/fa';
 import api from '../services/api';
 import { applyRole, getPrimaryRole } from '../services/auth';
 import '../styles/login.css';
@@ -11,15 +11,8 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 const LoginPage = ({ onLogin }) => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  const validateEmail = (value) => {
-    const alunoPattern = /^[a-zA-Z0-9._-]+@alunos\.uevora\.pt$/;
-    const professorPattern = /^[a-zA-Z0-9._-]+@uevora\.pt$/;
-    return alunoPattern.test(value) || professorPattern.test(value);
-  };
 
   // Decide para onde ir após autenticar: se o utilizador tiver 2+ perfis,
   // mostra a página de seleção; caso contrário entra direto.
@@ -39,50 +32,21 @@ const LoginPage = ({ onLogin }) => {
     navigate(enriched.defaultPage);
   };
 
-  // Login por email institucional (sem password)
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-
-    if (!email) {
-      setError('Por favor, insira o seu email institucional.');
-      return;
-    }
-    if (!validateEmail(email)) {
-      setError('Por favor, utilize um email institucional válido (@uevora.pt ou @alunos.uevora.pt)');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const { ok, data } = await api.login(email);
-      if (!ok) {
-        setError(data.detail || 'Não foi possível autenticar. Tente novamente.');
-        return;
-      }
-      finalizeLogin(data.user);
-    } catch (err) {
-      console.error('Erro no login:', err);
-      setError('Erro de ligação ao servidor. Verifique se o backend está a correr.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Login com Google: recebe o ID token e envia-o ao backend
+  // Login com Google (email institucional): recebe o ID token e envia-o ao backend.
+  // Em caso de falha, fica na página e mostra a mensagem de erro.
   const handleGoogleSuccess = async (credentialResponse) => {
     setError('');
     setIsLoading(true);
     try {
       const { ok, data } = await api.loginWithGoogle(credentialResponse.credential);
       if (!ok) {
-        setError(data.detail || 'Não foi possível autenticar com o Google.');
+        setError(data.detail || 'A autenticação falhou. Tente novamente.');
         return;
       }
       finalizeLogin(data.user);
     } catch (err) {
       console.error('Erro no login Google:', err);
-      setError('Erro de ligação ao servidor.');
+      setError('Erro de ligação ao servidor. Verifique se o backend está a correr.');
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +66,7 @@ const LoginPage = ({ onLogin }) => {
             <p>Universidade de Évora</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="login-form">
+          <div className="login-form">
             {error && (
               <div className="error-message">
                 <span>⚠️</span>
@@ -110,69 +74,35 @@ const LoginPage = ({ onLogin }) => {
               </div>
             )}
 
-            {/* Login com Google */}
+            <p className="login-instruction">
+              Inicie sessão com o seu email institucional Google
+              (@uevora.pt ou @alunos.uevora.pt).
+            </p>
+
+            {/* Único acesso ao sistema: login com Google */}
             {GOOGLE_CLIENT_ID ? (
               <div className="google-login-wrapper">
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
-                  onError={() => setError('Falha na autenticação com o Google.')}
+                  onError={() => setError('A autenticação com o Google falhou.')}
                   text="signin_with"
                   locale="pt-PT"
                   width="280"
                 />
+                {isLoading && (
+                  <div className="login-loading">
+                    <div className="spinner-small"></div>
+                    A autenticar...
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="login-info" style={{ marginBottom: '1rem' }}>
+              <div className="login-info">
                 <p className="info-title">ℹ️ Login Google não configurado</p>
-                <p>Define <code>VITE_GOOGLE_CLIENT_ID</code> (frontend) e <code>GOOGLE_CLIENT_ID</code> (backend) para ativar.</p>
+                <p>Define <code>VITE_GOOGLE_CLIENT_ID</code> (frontend) e <code>GOOGLE_CLIENT_ID</code> (backend) para ativar o acesso.</p>
               </div>
             )}
-
-            <div className="login-divider"><span>ou</span></div>
-
-            {/* Login por email institucional */}
-            <div className="form-group">
-              <label>
-                <FaEnvelope className="input-icon" />
-                Email Institucional
-              </label>
-              <input
-                type="email"
-                placeholder="exemplo@uevora.pt ou @alunos.uevora.pt"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="login-input"
-              />
-              <small className="input-hint">
-                Utilize o seu email institucional (@uevora.pt ou @alunos.uevora.pt)
-              </small>
-            </div>
-
-            <button type="submit" className="login-button" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <div className="spinner-small"></div>
-                  A autenticar...
-                </>
-              ) : (
-                <>
-                  <FaSignInAlt /> Entrar no Sistema
-                </>
-              )}
-            </button>
-
-            <div className="login-info">
-              <p className="info-title">ℹ️ Informação de Demonstração</p>
-              <p>Utilize qualquer email válido do domínio @uevora.pt ou @alunos.uevora.pt</p>
-              <div className="demo-emails">
-                <small>Exemplos:</small>
-                <code>admin@uevora.pt (Admin)</code>
-                <code>secretariado@uevora.pt (Secretariado)</code>
-                <code>professor@uevora.pt (Docente)</code>
-                <code>aluno@alunos.uevora.pt (Aluno)</code>
-              </div>
-            </div>
-          </form>
+          </div>
         </div>
       </div>
     </div>
