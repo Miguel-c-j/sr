@@ -97,11 +97,18 @@ class GoogleLoginView(APIView):
             from google.oauth2 import id_token
 
             info = id_token.verify_oauth2_token(
-                credential, google_requests.Request(), settings.GOOGLE_CLIENT_ID
+                credential,
+                google_requests.Request(),
+                settings.GOOGLE_CLIENT_ID,
+                # Tolera pequenas diferencas de relogio entre a maquina e a Google.
+                clock_skew_in_seconds=10,
             )
-        except Exception:
+        except Exception as exc:
+            detail = "Token Google invalido."
+            if settings.DEBUG:
+                detail = f"Token Google invalido: {type(exc).__name__}: {exc}"
             return Response(
-                {"detail": "Token Google invalido."},
+                {"detail": detail},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
