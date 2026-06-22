@@ -1,26 +1,14 @@
 // src/components/Filters/RoomFilters.jsx
 import { useState, useEffect, useMemo } from 'react';
 import { FaSearch, FaTrash, FaBookmark, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import api from '../../services/api';
 
-// Salas por edifício (dados estáticos dos filtros) — fora do componente para ser estável.
-const roomsByBuilding = {
-  "Colégio do Espírito Santo": [
-    { id: 1, name: "Sala 101" },
-    { id: 2, name: "Sala 102" },
-    { id: 3, name: "Laboratório 202" }
-  ],
-  "Colégio Mateus de Aranda": [
-    { id: 4, name: "Sala de Reuniões 305" },
-    { id: 5, name: "Sala 201" }
-  ],
-  "Pólo da Mitra": [
-    { id: 6, name: "Sala 001" },
-    { id: 7, name: "Sala 002" }
-  ],
-  "Complexo Desportivo": [
-    { id: 8, name: "Auditório" },
-    { id: 9, name: "Sala de Dança" }
-  ]
+// Rótulos amigáveis para os tipos de sala (valores vindos do backend).
+const ROOM_TYPE_LABELS = {
+  aula: 'Sala de Aula',
+  laboratorio: 'Laboratório',
+  reuniao: 'Sala de Reuniões',
+  auditorio: 'Auditório',
 };
 
 const RoomFilters = ({ onSearch, onClear, filters, setFilters, requiredFiltersFilled, preFillFilters = null }) => {
@@ -35,28 +23,38 @@ const RoomFilters = ({ onSearch, onClear, filters, setFilters, requiredFiltersFi
     equipamentos: false
   });
 
-  // Mock data for filters
-  const buildings = [
-    { id: 1, name: "Colégio do Espírito Santo" },
-    { id: 2, name: "Colégio Mateus de Aranda" },
-    { id: 3, name: "Pólo da Mitra" },
-    { id: 4, name: "Complexo Desportivo" }
-  ];
+  // Edifícios, salas e equipamentos reais, carregados da API (substituem os dados estáticos).
+  const [buildings, setBuildings] = useState([]);
+  const [allRooms, setAllRooms] = useState([]);
+  const [allEquipment, setAllEquipment] = useState([]);
 
-  const roomTypes = [
-    { id: "aula", label: "Aula" },
-    { id: "reuniao", label: "Reunião" },
-    { id: "laboratorio", label: "Laboratório" }
-  ];
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const [b, r, e] = await Promise.all([
+        api.getBuildings(),
+        api.getRooms(),
+        api.getEquipment(),
+      ]);
+      if (!active) return;
+      setBuildings(Array.isArray(b) ? b : []);
+      setAllRooms(Array.isArray(r) ? r : []);
+      setAllEquipment(Array.isArray(e) ? e : []);
+    })();
+    return () => { active = false; };
+  }, []);
 
-  const equipmentList = [
-    { id: "projetor", label: "Projetor" },
-    { id: "wifi", label: "WiFi" },
-    { id: "quadro", label: "Quadro Branco" },
-    { id: "computadores", label: "Computadores" },
-    { id: "arcondicionado", label: "Ar Condicionado" },
-    { id: "videoconferencia", label: "Videoconferência" }
-  ];
+  // Tipos de sala derivados das salas reais — assim nenhum tipo do seed fica de fora.
+  const roomTypes = useMemo(() => {
+    const types = [...new Set(allRooms.map(r => r.type).filter(Boolean))].sort();
+    return types.map(t => ({ id: t, label: ROOM_TYPE_LABELS[t] || t }));
+  }, [allRooms]);
+
+  // Equipamentos da API: o `code` é o valor que o backend filtra (equipment__code__in).
+  const equipmentList = useMemo(
+    () => allEquipment.map(e => ({ id: e.code, label: e.name, icon: e.icon })),
+    [allEquipment]
+  );
 
   // Generate time slots every 30 minutes
   const generateTimeSlots = () => {
@@ -80,10 +78,11 @@ const RoomFilters = ({ onSearch, onClear, filters, setFilters, requiredFiltersFi
     }
   }, [preFillFilters, setFilters]);
 
-  // Salas disponíveis para o edifício selecionado (derivado de filters.building)
+  // Salas disponíveis para o edifício selecionado (derivado de filters.building).
+  // Cada sala da API traz o nome do edifício em `building`.
   const availableRooms = useMemo(
-    () => (filters.building ? roomsByBuilding[filters.building] || [] : []),
-    [filters.building]
+    () => (filters.building ? allRooms.filter(r => r.building === filters.building) : []),
+    [filters.building, allRooms]
   );
 
   const toggleSection = (section) => {
@@ -297,7 +296,7 @@ const RoomFilters = ({ onSearch, onClear, filters, setFilters, requiredFiltersFi
                   checked={filters.equipment.includes(equip.id)}
                   onChange={() => handleEquipmentChange(equip.id)}
                 />
-                {equip.label}
+                {equip.icon ? `${equip.icon} ` : ''}{equip.label}
               </label>
             ))}
           </div>
